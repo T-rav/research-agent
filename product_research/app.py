@@ -19,7 +19,8 @@ def perplexity_search(query: str, num_results: int = 2) -> List[Dict]:
     if not api_key:
         raise ValueError("Perplexity API key not found in environment variables")
 
-    perplexity = perplexityai.Perplexity(api_key=api_key)
+    perplexity = perplexityai.Perplexity()
+    perplexity.token = api_key
     
     try:
         response = perplexity.search(query)
@@ -35,7 +36,7 @@ def perplexity_search(query: str, num_results: int = 2) -> List[Dict]:
         print(f"Error in Perplexity search: {str(e)}")
         return []
 
-def arxiv_search(query: str, max_results: int = 2) -> List[Dict]:
+def arxiv_search(query: str, max_results: int = 2) -> str:
     """
     Search Arxiv for papers and return the results including abstracts
     """
@@ -46,17 +47,21 @@ def arxiv_search(query: str, max_results: int = 2) -> List[Dict]:
         sort_by=arxiv.SortCriterion.Relevance
     )
 
-    results = []
+    formatted_results = []
     for paper in client.results(search):
-        results.append({
-            "title": paper.title,
-            "authors": [author.name for author in paper.authors],
-            "published": paper.published.strftime("%Y-%m-%d"),
-            "abstract": paper.summary,
-            "pdf_url": paper.pdf_url,
-        })
+        paper_info = (
+            f"Title: {paper.title}\n"
+            f"Authors: {', '.join(author.name for author in paper.authors)}\n"
+            f"Published: {paper.published.strftime('%Y-%m-%d')}\n"
+            f"Abstract: {paper.summary}\n"
+            f"PDF URL: {paper.pdf_url}\n"
+        )
+        formatted_results.append(paper_info)
 
-    return results
+    if not formatted_results:
+        return "No papers found matching the query."
+        
+    return "\n\n".join(formatted_results)
 
 # Configure the OpenAI API
 config_list = autogen.config_list_from_json(
@@ -148,7 +153,7 @@ arxiv_search_agent = AssistantAgent(
     2. Related Technical Areas
        - Adjacent technologies
        - Complementary solutions
-       
+    
     Use the arxiv_search function to find relevant research papers and extract key insights.
     
     After your analysis, provide your findings in this format:
@@ -225,12 +230,19 @@ async def run_product_research(topic: str):
     """
     print(f"Starting literature review on topic: {topic}")
     
+    # Create a group chat
+    groupchat = GroupChat(
+        agents=[perplexity_search_agent, arxiv_search_agent, product_strategy_agent],
+        messages=[],
+        max_round=12
+    )
+
     # Create a user proxy agent
     user_proxy = UserProxyAgent(
         name="User_Proxy",
         human_input_mode="NEVER",
         max_consecutive_auto_reply=10,
-        is_termination_msg=lambda x: x.get("content", "").rstrip().endswith("TERMINATE"),
+        is_termination_msg=lambda x: isinstance(x.get("content", ""), str) and x.get("content", "").rstrip().endswith("TERMINATE"),
         code_execution_config={
             "work_dir": "product_research",
             "use_docker": False,
@@ -247,64 +259,73 @@ async def run_product_research(topic: str):
         }
     )
 
-    # First phase: Market Research
-    print("\nPhase 1: Market Research")
+    # Start the group chat
+    print("Phase 1: Market Research")
     await user_proxy.a_initiate_chat(
         perplexity_search_agent,
         message=f"Research market trends and competitors for {topic}. Use perplexity_search to gather information."
     )
-    
-    market_research = ""
-    for msg in reversed(user_proxy.chat_messages[perplexity_search_agent]):
-        if msg["role"] == "assistant" and "TERMINATE" in msg.get("content", ""):
-            market_research = msg["content"].split("TERMINATE")[0].strip()
-            print("Debug: Found market research content")
-            break
-    
-    # Second phase: Technical Research
+
+    # Extract findings from market research
+    market_findings = ""
+    for msg in user_proxy.chat_messages[perplexity_search_agent]:
+        content = msg.get("content", "")
+        if msg["role"] == "assistant" and isinstance(content, str) and "FINDINGS" in content:
+            start = content.find("<FINDINGS>") + len("<FINDINGS>")
+            end = content.find("TERMINATE")
+            if end != -1:
+                market_findings = content[start:end].strip()
+                break
+
     print("\nPhase 2: Technical Research")
     await user_proxy.a_initiate_chat(
         arxiv_search_agent,
-        message=f"Research technical aspects and innovations for {topic}. Use arxiv_search to gather information."
+        message=f"Research technical aspects and innovations for {topic}. Use arxiv_search to find relevant papers."
     )
-    
-    tech_research = ""
-    for msg in reversed(user_proxy.chat_messages[arxiv_search_agent]):
-        if msg["role"] == "assistant" and "TERMINATE" in msg.get("content", ""):
-            tech_research = msg["content"].split("TERMINATE")[0].strip()
-            print("Debug: Found technical research content")
-            break
-    
-    # Third phase: Product Strategy
-    print("\nPhase 3: Product Strategy")
-    combined_research = f"""
+
+    # Extract findings from technical research
+    technical_findings = ""
+    for msg in user_proxy.chat_messages[arxiv_search_agent]:
+        content = msg.get("content", "")
+        if msg["role"] == "assistant" and isinstance(content, str) and "FINDINGS" in content:
+            start = content.find("<FINDINGS>") + len("<FINDINGS>")
+            end = content.find("TERMINATE")
+            if end != -1:
+                technical_findings = content[start:end].strip()
+                break
+
+    # Combine market and technical findings
+    combined_findings = f"""
 Market Research Findings:
-{market_research}
+{market_findings}
 
 Technical Research Findings:
-{tech_research}
+{technical_findings}
 """
-    
+
+    print("\nPhase 3: Product Strategy")
     await user_proxy.a_initiate_chat(
         product_strategy_agent,
-        message=f"Based on this research, create an executive summary for {topic}:\n\n{combined_research}"
+        message=f"Based on this research, create an executive summary for {topic}:\n\n{combined_findings}"
     )
-    
-    summary_content = None
-    detailed_report = combined_research
-    
-    for msg in reversed(user_proxy.chat_messages[product_strategy_agent]):
-        if msg["role"] == "assistant" and "SUMMARY_COMPLETE" in msg.get("content", ""):
-            summary_content = msg["content"].split("SUMMARY_COMPLETE")[0].strip()
-            print("Debug: Found summary content")
-            break
-    
+
+    # Extract executive summary
+    summary_content = ""
+    for msg in user_proxy.chat_messages[product_strategy_agent]:
+        content = msg.get("content", "")
+        if msg["role"] == "assistant" and isinstance(content, str) and "SUMMARY" in content:
+            start = content.find("<SUMMARY>") + len("<SUMMARY>")
+            end = content.find("SUMMARY_COMPLETE")
+            if end != -1:
+                summary_content = content[start:end].strip()
+                break
+
     # Write both summary and report to files
-    if summary_content and detailed_report:
+    if summary_content and combined_findings:
         print("\nDebug: About to write files...")
         print(f"Debug: Summary content exists: {bool(summary_content)}")
-        print(f"Debug: Detailed report exists: {bool(detailed_report)}")
-        report_file = write_summary_to_file(summary_content, detailed_report, topic)
+        print(f"Debug: Detailed report exists: {bool(combined_findings)}")
+        report_file = write_summary_to_file(summary_content, combined_findings, topic)
         print(f"\nCombined report has been written to: {report_file}")
         print("\nExecutive Summary:")
         print("-" * 80)
