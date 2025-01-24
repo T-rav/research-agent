@@ -88,19 +88,36 @@ perplexity_search_agent = AssistantAgent(
 arxiv_search_agent = AssistantAgent(
     name="Technology_Research_Agent",
     llm_config={"config_list": config_list},
-    system_message="""You are a technology research specialist that searches for relevant technical innovations and research.
-    Focus on finding papers about:
-    - Technical innovations in the field
-    - Novel approaches and methodologies
-    - System architectures and designs
-    - Performance improvements and optimizations
-    - Technical feasibility studies
+    system_message="""You are a technology research specialist that breaks down topics into key technical components and explores related areas.
     
-    Use this function to search:
+    When given a topic, first break it down into:
+    1. Core Technology Components
+       - Key technical elements
+       - Required capabilities
+       - Supporting technologies
+    
+    2. Related Technical Areas
+       - Adjacent technologies
+       - Complementary solutions
+       - Alternative approaches
+    
+    3. Implementation Aspects
+       - Architecture considerations
+       - Performance factors
+       - Integration requirements
+    
+    For each identified area, search for relevant papers using:
     ```python
     arxiv_search(query: str, max_results: int = 2) -> List[Dict]
     ```
-    Extract technical insights that could inform product development."""
+    
+    For example, if researching "Speech recognition in note-taking apps", explore:
+    - Core: Speech-to-text algorithms, audio processing, noise reduction
+    - Related: Natural language processing, text summarization, context understanding
+    - Implementation: Real-time processing, mobile optimization, offline capabilities
+    
+    After each search, summarize key technical insights that could inform product development.
+    Focus on practical applications and recent innovations."""
 )
 
 report_agent = AssistantAgent(
@@ -153,7 +170,7 @@ report_agent = AssistantAgent(
     
     Format the report in markdown with clear sections and subsections.
     Include specific examples, data points, and sources where available.
-    Your response should end with the word 'TERMINATE'"""
+    IMPORTANT: You must end your final response with the exact word 'TERMINATE' on a new line."""
 )
 
 executive_summary_agent = AssistantAgent(
@@ -169,7 +186,7 @@ executive_summary_agent = AssistantAgent(
     
     Format the summary in markdown with clear sections and bullet points.
     Keep it actionable and business-focused.
-    Your response should end with the word 'SUMMARY_COMPLETE'"""
+    IMPORTANT: You must end your final response with the exact word 'SUMMARY_COMPLETE' on a new line."""
 )
 
 def write_summary_to_file(summary: str, detailed_report: str, topic: str):
@@ -241,6 +258,13 @@ async def run_product_research(topic: str):
         message=f"Write a product research report on {topic}. Use perplexity_search and arxiv_search functions to gather information.",
     )
     
+    print("\nDebug: After review chat:")
+    print("Debug: Available agents in chat:", list(user_proxy.chat_messages.keys()))
+    for agent, messages in user_proxy.chat_messages.items():
+        print(f"\nDebug: Messages for {agent.name}:")
+        for msg in messages:
+            print(f"- {msg.get('role')}: {msg.get('content')[:100]}...")
+    
     # Get the last message from the report agent (the complete review)
     review_content = ""
     for msg in reversed(user_proxy.chat_messages[report_agent]):
@@ -270,17 +294,43 @@ async def run_product_research(topic: str):
     
     # Get the executive summary content
     summary_content = None
-    for msg in summary_manager.chat_messages[user_proxy]:
-        if "SUMMARY_COMPLETE" in msg:
-            summary_content = msg.replace("SUMMARY_COMPLETE", "").strip()
+    print("\nDebug: Looking for executive summary in manager messages...")
+    for msg in reversed(summary_manager.chat_messages[user_proxy]):
+        print(f"Debug: Message content: {str(msg.get('content', ''))[:100]}...")
+        if isinstance(msg, dict) and msg.get('content', '') and "SUMMARY_COMPLETE" in msg['content']:
+            summary_content = msg['content'].replace("SUMMARY_COMPLETE", "").strip()
+            print("Debug: Found summary!")
             break
+    
+    if not summary_content:
+        print("\nDebug: Trying alternative message source for summary...")
+        for agent, messages in summary_manager.chat_messages.items():
+            if hasattr(agent, 'name') and agent.name == "Product_Strategy_Agent":
+                for msg in reversed(messages):
+                    if isinstance(msg, dict) and msg.get('content', '') and "SUMMARY_COMPLETE" in msg['content']:
+                        summary_content = msg['content'].replace("SUMMARY_COMPLETE", "").strip()
+                        print("Debug: Found summary in alternative source!")
+                        break
     
     # Get the detailed report content
     detailed_report = None
-    for msg in manager.chat_messages[user_proxy]:
-        if "TERMINATE" in msg:
-            detailed_report = msg.replace("TERMINATE", "").strip()
+    print("\nDebug: Looking for detailed report in manager messages...")
+    for msg in reversed(manager.chat_messages[user_proxy]):
+        print(f"Debug: Message content: {str(msg.get('content', ''))[:100]}...")
+        if isinstance(msg, dict) and msg.get('content', '') and "TERMINATE" in msg['content']:
+            detailed_report = msg['content'].replace("TERMINATE", "").strip()
+            print("Debug: Found report!")
             break
+    
+    if not detailed_report:
+        print("\nDebug: Trying alternative message source for report...")
+        for agent, messages in manager.chat_messages.items():
+            if hasattr(agent, 'name') and agent.name == "Product_Research_Agent":
+                for msg in reversed(messages):
+                    if isinstance(msg, dict) and msg.get('content', '') and "TERMINATE" in msg['content']:
+                        detailed_report = msg['content'].replace("TERMINATE", "").strip()
+                        print("Debug: Found report in alternative source!")
+                        break
     
     # Write both summary and report to files
     if summary_content and detailed_report:
