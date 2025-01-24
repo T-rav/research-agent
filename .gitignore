@@ -1,6 +1,8 @@
 #AutoGen
 OAI_CONFIG_LIST
-summaries
+summaries/
+reports/
+.cache/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
