@@ -1,3 +1,5 @@
+import os
+
 def extract_findings(messages):
     """Extract findings from agent messages"""
     if not messages:
@@ -72,3 +74,26 @@ def extract_summary(messages):
                         return content[start:end].strip()
                 return content.strip()
     return ""
+
+def write_summary_to_file(topic: str, market_findings: str, technical_findings: str, report_file: str) -> None:
+    """Write research summary to a markdown file."""
+    try:
+        # Create reports directory if it doesn't exist
+        os.makedirs(os.path.dirname(report_file), exist_ok=True)
+        
+        # Format the report
+        report_content = f"""# Research Report: {topic}
+
+## Market Analysis
+{market_findings}
+
+## Technical Analysis
+{technical_findings}
+"""
+        
+        # Write to file
+        with open(report_file, 'w') as f:
+            f.write(report_content)
+            
+    except Exception as e:
+        print(f"Error writing summary to file: {str(e)}")

@@ -107,3 +107,24 @@ class ResearchMemory:
     def get_last_updated(self, section: str) -> Optional[str]:
         """Get when a section was last updated."""
         return self.memory.get("_last_updated", {}).get(section)
+    
+    def get_market_findings(self) -> str:
+        """Get all market-related findings."""
+        sections = []
+        
+        if self.memory.get("market_size"):
+            sections.append("### Market Size\n" + self.memory["market_size"])
+            
+        if self.memory.get("competitors"):
+            sections.append("### Competitive Landscape\n" + self.memory["competitors"])
+            
+        if self.memory.get("trends"):
+            sections.append("### Market Trends\n" + self.memory["trends"])
+            
+        return "\n\n".join(sections) if sections else "No market findings available."
+    
+    def get_technical_findings(self) -> str:
+        """Get all technical findings."""
+        if self.memory.get("technical"):
+            return self.memory["technical"]
+        return "No technical findings available."
