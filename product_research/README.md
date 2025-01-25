@@ -1,16 +1,17 @@
-# AutoGen Literature Review
+# AutoGen Product Research
 
-This project implements an automated literature review system using Microsoft's AutoGen framework. It uses multiple AI agents to search, analyze, and synthesize information from both Perplexity AI and arXiv to create comprehensive literature reviews.
+This project implements an automated product research system using Microsoft's AutoGen framework. It uses AI agents to search, analyze, and synthesize market and technical information from Perplexity AI to create comprehensive product research reports.
 
 ## Features
 
-- Perplexity AI integration for web content search
-- arXiv integration for academic papers
-- Multi-agent system with specialized roles:
-  - Perplexity Search Agent
-  - arXiv Search Agent
-  - Report Generation Agent
-- Automated synthesis of information into a coherent literature review
+- Perplexity AI integration for market research
+- Multi-agent system for specialized research tasks:
+  - Market size analysis
+  - Key player identification
+  - Market trends analysis
+  - Technical innovation research
+- JSON-based memory management for persistent storage
+- Automated report generation with executive summaries
 
 ## Setup
 
@@ -19,49 +20,57 @@ This project implements an automated literature review system using Microsoft's 
 pip install -r requirements.txt
 ```
 
-2. Create a `.env` file in the project root with your API keys:
-```
-PERPLEXITY_API_KEY=your_perplexity_api_key
-OPENAI_API_KEY=your_openai_api_key
-```
-
-3. Create an `OAI_CONFIG_LIST` file with your OpenAI configuration:
+2. Create an OpenAI API key configuration:
+Create a file named `OAI_CONFIG_LIST` with your OpenAI API key:
 ```json
 [
     {
-        "model": "gpt-4",
-        "api_key": "your_openai_api_key"
+        "model": "gpt-4o-mini",
+        "api_key": "your-api-key-here"
     }
 ]
 ```
 
 ## Usage
 
-Run the script with your desired research topic:
-
-```python
-python app.py
+Run the research agent with a topic:
+```bash
+python app.py "your research topic"
 ```
 
-By default, it will generate a literature review on "no code tools for building multi agent AI systems". You can modify the topic in the script by changing the `topic` variable at the bottom of the file.
+For example:
+```bash
+python app.py "AI code generation market and technology trends"
+```
 
-## How it Works
+The agent will:
+1. Research market size and growth rates
+2. Identify key players and their market share
+3. Analyze market trends and developments
+4. Research technical innovations
+5. Generate an executive summary
+6. Create a detailed markdown report
 
-1. The system creates three specialized agents:
-   - Perplexity Search Agent: Searches the web for relevant information using Perplexity AI
-   - arXiv Search Agent: Searches academic papers
-   - Report Agent: Synthesizes information into a coherent review
+## Output
 
-2. The agents work together in a round-robin fashion to:
-   - Gather information from multiple sources
-   - Analyze and synthesize the information
-   - Generate a comprehensive literature review
+The system generates several outputs:
+- JSON memory files in `research_memory/` for persistent storage
+- Markdown reports in `reports/` with:
+  - Executive summary
+  - Key findings
+  - Market opportunities
+  - Recommendations
 
-3. The final report includes proper citations and references to both web and academic sources.
+## Architecture
 
-## Requirements
+The system uses:
+- AutoGen for multi-agent orchestration
+- Perplexity AI for market research
+- JSON-based memory management for data persistence
+- Markdown report generation for clean output
 
-- Python 3.7+
-- Perplexity API key
-- OpenAI API key
-- Internet connection for web and arXiv searches
+## Dependencies
+
+- Python 3.8+
+- AutoGen
+- Other dependencies listed in `requirements.txt`
