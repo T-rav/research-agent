@@ -1,13 +1,33 @@
-from modules import (
-    create_agents,
-    extract_findings,
-    extract_summary
-)
+import os
+import json
+from typing import Dict, List
+import autogen
+from modules.agents import create_agents
 from modules.research_memory import ResearchMemory
 from modules.report_generator import write_summary_to_file
 from datetime import datetime
-from modules.agents import create_agents
-import autogen
+
+def extract_findings(content: str) -> str:
+    """Extract research findings from agent response."""
+    return content.strip() if content else ""
+
+def extract_summary(content: str) -> str:
+    """Extract summary from agent response."""
+    if not content:
+        return ""
+    
+    # Extract content between SUMMARY_START and SUMMARY_COMPLETE
+    start_marker = "SUMMARY_START"
+    end_marker = "SUMMARY_COMPLETE"
+    
+    start_idx = content.find(start_marker)
+    end_idx = content.find(end_marker)
+    
+    if start_idx == -1 or end_idx == -1:
+        return content.strip()
+    
+    summary = content[start_idx + len(start_marker):end_idx].strip()
+    return summary
 
 async def run_product_research(topic: str):
     """
@@ -175,7 +195,9 @@ if __name__ == "__main__":
     import asyncio
     import sys
     
-    # Get topic from command line argument, or use default
-    topic = " ".join(sys.argv[1:]) if len(sys.argv) > 1 else "AI agents for product research"
-    print(f"Researching topic: {topic}")
+    if len(sys.argv) < 2:
+        print("Please provide a research topic")
+        sys.exit(1)
+        
+    topic = " ".join(sys.argv[1:])
     asyncio.run(run_product_research(topic))
