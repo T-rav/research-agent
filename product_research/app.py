@@ -5,12 +5,17 @@ from modules import (
 )
 from modules.research_memory import ResearchMemory
 from modules.report_generator import write_summary_to_file
+from datetime import datetime
 
 async def run_product_research(topic: str):
     """
     Run product research on the given topic
     """
     print(f"Starting product research on topic: {topic}")
+    
+    # Get current year for queries
+    current_year = datetime.now().year
+    projection_year = current_year + 5
     
     # Create agents and research memory
     research_agent, user_proxy = create_agents()
@@ -26,7 +31,7 @@ async def run_product_research(topic: str):
     else:
         query = f"""Search for market size information about {topic}.
             
-            Find current market size, growth rate, and market projections. Include specific revenue numbers and growth rates.
+            Find current market size as of {current_year}, growth rate, and market projections through {projection_year}. Include specific revenue numbers and growth rates.
             
             Format your response with specific numbers and data points."""
         await user_proxy.a_initiate_chat(research_agent, message=query)
@@ -43,7 +48,7 @@ async def run_product_research(topic: str):
     else:
         query = f"""Search for information about key players in {topic}.
             
-            Find major companies and startups in this field. Include market share, revenue, funding, and notable products or services.
+            Find major companies and startups in this field as of {current_year}. Include market share, revenue, funding, and notable products or services.
             
             Format your response with specific company details."""
         await user_proxy.a_initiate_chat(research_agent, message=query)
@@ -60,7 +65,7 @@ async def run_product_research(topic: str):
     else:
         query = f"""Search for market trends in {topic}.
             
-            Find the latest market trends and developments. Include adoption rates, user statistics, and industry shifts.
+            Find the latest market trends and developments in {current_year}. Include adoption rates, user statistics, and industry shifts.
             
             Format your response with specific trend analysis."""
         await user_proxy.a_initiate_chat(research_agent, message=query)
@@ -77,7 +82,7 @@ async def run_product_research(topic: str):
     else:
         query = f"""Search for technical innovations in {topic}.
             
-            Find the latest technical innovations and breakthroughs. Include specific technologies, performance metrics, and technical capabilities.
+            Find the latest technical innovations and breakthroughs as of {current_year}. Include specific technologies, performance metrics, and technical capabilities.
             
             Format your response with specific technical details."""
         await user_proxy.a_initiate_chat(research_agent, message=query)
