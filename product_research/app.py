@@ -84,118 +84,96 @@ config_list = autogen.config_list_from_json(
 
 # Create agents
 perplexity_search_agent = AssistantAgent(
-    name="Market_Research_Agent",
-    llm_config={
-        "config_list": config_list,
-        "functions": [
-            {
-                "name": "perplexity_search",
-                "description": "Search using Perplexity AI API",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "query": {
-                            "type": "string",
-                            "description": "Search query"
-                        },
-                        "num_results": {
-                            "type": "integer",
-                            "description": "Number of results to return",
-                            "default": 2
-                        }
-                    },
-                    "required": ["query"]
-                }
-            }
-        ]
-    },
-    system_message="""You are a market research specialist that searches for product and market insights.
-    Focus on finding information about:
-    - Market trends and opportunities
-    - Competitor products and features
-    - User needs and pain points
-    - Industry developments
-    - Technology trends
+    name="Perplexity_Search_Agent",
+    llm_config={"config_list": config_list},
+    system_message="""You are a helpful AI assistant that can search for information using Perplexity AI.
+    When asked for information, use the perplexity_search function to gather market research data.
+    Format your response as follows:
+    1. Start with "<FINDINGS>"
+    2. Present your findings in a clear, structured format with sections
+    3. End with "TERMINATE"
     
-    Use the perplexity_search function to gather real market insights. After each search, analyze the results and provide structured findings.
-    
-    After analyzing search results, provide your findings in this format:
-    
+    Example format:
     <FINDINGS>
-    [Your detailed analysis here]
+    # Market Overview
+    [Your content here]
+    
+    # Key Players
+    [Your content here]
+    
+    # Market Trends
+    [Your content here]
+    
+    # Competitive Analysis
+    [Your content here]
     TERMINATE
-    </FINDINGS>"""
+    """
 )
 
 arxiv_search_agent = AssistantAgent(
-    name="Technology_Research_Agent",
-    llm_config={
-        "config_list": config_list,
-        "functions": [
-            {
-                "name": "arxiv_search",
-                "description": "Search Arxiv for papers and return the results including abstracts",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "query": {
-                            "type": "string",
-                            "description": "Search query"
-                        },
-                        "max_results": {
-                            "type": "integer",
-                            "description": "Maximum number of results to return",
-                            "default": 2
-                        }
-                    },
-                    "required": ["query"]
-                }
-            }
-        ]
-    },
-    system_message="""You are a technology research specialist that breaks down topics into key technical components and explores related areas.
+    name="Arxiv_Search_Agent",
+    llm_config={"config_list": config_list},
+    system_message="""You are a helpful AI assistant that can search for academic papers on arXiv.
+    When asked for papers, use the arxiv_search function to gather technical research data.
+    Format your response as follows:
+    1. Start with "<FINDINGS>"
+    2. Present your findings in a clear, structured format with sections
+    3. Include paper citations and key insights
+    4. End with "TERMINATE"
     
-    When given a topic, first break it down into:
-    1. Core Technology Components
-       - Key technical elements
-       - Required capabilities
-       - Supporting technologies
-    
-    2. Related Technical Areas
-       - Adjacent technologies
-       - Complementary solutions
-    
-    Use the arxiv_search function to find relevant research papers and extract key insights.
-    
-    After your analysis, provide your findings in this format:
-    
+    Example format:
     <FINDINGS>
-    [Your detailed analysis here]
+    # Technical Innovations
+    [Your content here]
+    
+    # Research Trends
+    [Your content here]
+    
+    # Key Papers and Findings
+    [Your content here with proper citations]
+    
+    # Future Directions
+    [Your content here]
     TERMINATE
-    </FINDINGS>"""
+    """
 )
 
 product_strategy_agent = AssistantAgent(
     name="Product_Strategy_Agent",
     llm_config={"config_list": config_list},
-    system_message="""You are a product strategy specialist that creates impactful executive summaries.
+    system_message="""You are a skilled product strategist that creates comprehensive executive summaries.
+    When creating a summary:
+    1. Start with "<SUMMARY>"
+    2. Include clear sections: Overview, Market Analysis, Technical Analysis, Opportunities, Challenges, and Recommendations
+    3. Be specific and actionable
+    4. End with "SUMMARY_COMPLETE"
     
-    Your role is to:
-    1. Review market and technology research
-    2. Identify key opportunities and challenges
-    3. Propose specific product ideas and features
-    4. Highlight competitive advantages
-    5. Suggest implementation priorities
-    
-    After your analysis, provide your findings in this format:
-    
+    Example format:
     <SUMMARY>
-    [Your executive summary here]
+    # Executive Summary
+    
+    ## Overview
+    [Your content here]
+    
+    ## Market Analysis
+    [Your content here]
+    
+    ## Technical Analysis
+    [Your content here]
+    
+    ## Opportunities
+    [Your content here]
+    
+    ## Challenges
+    [Your content here]
+    
+    ## Recommendations
+    [Your content here]
     SUMMARY_COMPLETE
-    </SUMMARY>"""
+    """
 )
 
-def write_summary_to_file(summary: str, detailed_report: str, topic: str):
+def write_summary_to_file(summary: str, detailed_report: str, topic: str, market_findings: str, technical_findings: str):
     """
     Write a combined report with executive summary and detailed findings to a single markdown file
     """
@@ -203,36 +181,34 @@ def write_summary_to_file(summary: str, detailed_report: str, topic: str):
     safe_filename = "".join(x for x in topic if x.isalnum() or x in (' ', '-', '_')).rstrip()
     safe_filename = safe_filename.replace(' ', '_').lower()
     
-    # Create reports directory if it doesn't exist
-    reports_dir = os.path.join(os.path.dirname(__file__), "..", "reports")
-    os.makedirs(reports_dir, exist_ok=True)
+    filename = f"reports/product_research_report_{safe_filename}.md"
     
-    # Write combined report
-    report_filename = f"product_research_report_{safe_filename}.md"
-    report_filepath = os.path.join(reports_dir, report_filename)
+    # Ensure the reports directory exists
+    os.makedirs("reports", exist_ok=True)
     
-    # Extract top 3 product ideas from the detailed report
-    import re
-    product_ideas = re.findall(r'(?:^|\n)(\d+\.\s+.*?)(?=\n\d+\.|\n\n|$)', detailed_report, re.MULTILINE)
-    top_3_ideas = product_ideas[:3] if product_ideas else []
+    # Format the complete report
+    report_content = f"""# Product Research Report: {topic}
+
+## Executive Summary
+
+{summary}
+
+### Top 3 Product Opportunities
+{detailed_report}
+
+## Detailed Analysis
+
+### Market Research Findings:
+{market_findings}
+
+### Technical Research Findings:
+{technical_findings}
+"""
     
-    with open(report_filepath, 'w') as f:
-        # Write title
-        f.write(f"# Product Research Report: {topic}\n\n")
-        
-        # Write executive summary with top 3 ideas
-        f.write("## Executive Summary\n\n")
-        f.write(summary)
-        f.write("\n\n### Top 3 Product Opportunities\n\n")
-        for idx, idea in enumerate(top_3_ideas, 1):
-            f.write(f"{idx}. {idea.strip()}\n")
-        f.write("\n")
-        
-        # Write detailed report
-        f.write("## Detailed Analysis\n\n")
-        f.write(detailed_report)
+    with open(filename, 'w') as f:
+        f.write(report_content)
     
-    return report_filename
+    return filename
 
 # Function to run the literature review
 async def run_product_research(topic: str):
@@ -336,7 +312,7 @@ Technical Research Findings:
         print("\nDebug: About to write files...")
         print(f"Debug: Summary content exists: {bool(summary_content)}")
         print(f"Debug: Detailed report exists: {bool(combined_findings)}")
-        report_file = write_summary_to_file(summary_content, combined_findings, topic)
+        report_file = write_summary_to_file(summary_content, "", topic, market_findings, technical_findings)
         print(f"\nCombined report has been written to: {report_file}")
         print("\nExecutive Summary:")
         print("-" * 80)
