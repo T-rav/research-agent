@@ -6,189 +6,170 @@ from modules import (
 from modules.research_memory import ResearchMemory
 from modules.report_generator import write_summary_to_file
 from datetime import datetime
+from modules.agents import create_agents
+import autogen
 
 async def run_product_research(topic: str):
     """
-    Run product research on the given topic
+    Run comprehensive product research on a given topic.
     """
-    print(f"Starting product research on topic: {topic}")
+    print(f"\nResearching topic: {topic}")
     
-    # Get current year for queries
-    current_year = datetime.now().year
-    projection_year = current_year + 5
+    # Initialize memory and report generator
+    memory = ResearchMemory()
+    report_file = f"reports/{datetime.now().strftime('%Y%m%d_%H%M%S')}_{topic.replace(' ', '_')}.md"
     
-    # Create agents and research memory
-    research_agent, user_proxy = create_agents()
-    memory = ResearchMemory(topic)
-    
-    # Phase 1: Market Research
-    print("\nPhase 1: Market Research")
-    
-    # Get market size data
-    print("Researching market size...")
-    if memory.get_market_size():
-        print("Market size data already exists, skipping...")
-    else:
-        query = f"""Search for market size information about {topic}.
-            
-            Find current market size as of {current_year}, growth rate, and market projections through {projection_year}. Focus on:
-            - Global and regional market size data
-            - CAGR (Compound Annual Growth Rate)
-            - Market segmentation by type and application
+    try:
+        # Create agents
+        agents = create_agents()
+        research_lead = agents["lead"]
+        user_proxy = agents["proxy"]
+
+        # Initialize group chat
+        groupchat = autogen.GroupChat(
+            agents=[
+                agents["lead"],
+                agents["analyst"], 
+                agents["researcher"],
+                agents["reviewer"],
+                agents["proxy"]
+            ],
+            messages=[],
+            max_round=12
+        )
+        
+        # Create manager
+        manager = autogen.GroupChatManager(groupchat=groupchat)
+        
+        # Market Size Research
+        print("\nResearching market size and opportunity...")
+        query = f"""Research the market size and growth potential for {topic}:
+            - Total addressable market (TAM)
+            - Current market value and CAGR
+            - Regional market breakdown
             - Key growth drivers and market dynamics
             
             Prioritize data from industry reports, market research firms, and financial analyses."""
-        await user_proxy.a_initiate_chat(research_agent, message=query)
-        market_size = extract_findings(user_proxy.chat_messages[research_agent])
+        results = await run_team_research(query, user_proxy, research_lead, manager)
+        market_size = extract_findings(results)
         if not market_size:
             print("Warning: No market size data found")
         else:
-            memory.save_market_size(market_size)
-    
-    # Get key players data
-    print("Researching key players...")
-    if memory.get_key_players():
-        print("Key players data already exists, skipping...")
-    else:
-        query = f"""Search for information about key players in {topic}.
-            
-            Find major companies and startups in this field as of {current_year}. Include:
-            - Market share and competitive positioning
-            - Revenue data and financial performance
-            - Recent funding rounds and investments
-            - Product portfolio and technological capabilities
+            memory.add_market_size_data(market_size)
+            print("✓ Market size research complete")
+
+        # Key Players Research
+        print("\nResearching key players and competitive landscape...")
+        query = f"""Analyze the competitive landscape for {topic}:
+            - Market leaders and their market share
+            - Key differentiators and value propositions
+            - Business models and pricing strategies
             - Strategic partnerships and acquisitions
             
             Focus on company reports, investor presentations, and industry analyses."""
-        await user_proxy.a_initiate_chat(research_agent, message=query)
-        key_players = extract_findings(user_proxy.chat_messages[research_agent])
+        results = await run_team_research(query, user_proxy, research_lead, manager)
+        key_players = extract_findings(results)
         if not key_players:
             print("Warning: No key players data found")
         else:
-            memory.save_key_players(key_players)
+            memory.add_competitor_data(key_players)
+            print("✓ Competitor research complete")
 
-    # Get market trends
-    print("Researching market trends...")
-    if memory.get_market_trends():
-        print("Market trends data already exists, skipping...")
-    else:
-        query = f"""Search for market trends in {topic}.
-            
-            Find the latest market trends and developments in {current_year}. Cover:
-            - Current adoption rates and deployment statistics
-            - Regional adoption patterns
-            - Regulatory landscape and policy changes
-            - Consumer/end-user preferences and feedback
+        # Market Trends Research
+        print("\nResearching market trends and dynamics...")
+        query = f"""Identify key market trends and dynamics in {topic}:
+            - Current and emerging trends
+            - Customer needs and pain points
+            - Regulatory environment and compliance
             - Implementation challenges and solutions
             
             Use healthcare industry reports, regulatory documents, and market surveys."""
-        await user_proxy.a_initiate_chat(research_agent, message=query)
-        market_trends = extract_findings(user_proxy.chat_messages[research_agent])
+        results = await run_team_research(query, user_proxy, research_lead, manager)
+        market_trends = extract_findings(results)
         if not market_trends:
             print("Warning: No market trends data found")
         else:
-            memory.save_market_trends(market_trends)
-    
-    # Phase 2: Technical Research
-    print("\nPhase 2: Technical Research")
-    if memory.get_tech_findings():
-        print("Technical research data already exists, skipping...")
-    else:
-        query = f"""Search for technical innovations in {topic}.
-            
-            Find the latest technical innovations and breakthroughs as of {current_year}. Include:
-            - Recent technological advancements
-            - Performance benchmarks and comparisons
-            - Safety and reliability metrics
-            - Integration capabilities and standards
+            memory.add_trend_data(market_trends)
+            print("✓ Market trends research complete")
+
+        # Technical Research
+        print("\nConducting technical research...")
+        query = f"""Analyze the technical aspects of {topic}:
+            - Key technologies and platforms
+            - Technical requirements and standards
+            - Implementation considerations
             - Patent and IP landscape
             
             Reference technical papers, patent databases, and product documentation."""
-        await user_proxy.a_initiate_chat(research_agent, message=query)
-        tech_findings = extract_findings(user_proxy.chat_messages[research_agent])
+        results = await run_team_research(query, user_proxy, research_lead, manager)
+        tech_findings = extract_findings(results)
         if not tech_findings:
             print("Warning: No technical research data found")
         else:
-            memory.save_tech_findings(tech_findings)
+            memory.add_technical_data(tech_findings)
+            print("✓ Technical research complete")
 
-    # Verify we have enough data to proceed
-    findings = memory.get_all_findings()
-    if not any([findings["market_size"], findings["key_players"], 
-                findings["market_trends"], findings["tech_findings"]]):
-        print("\nError: No research data was collected. Please try again.")
-        return
+        # Generate Summary
+        print("\nGenerating comprehensive summary...")
+        query = f"""Based on all research findings for {topic}, generate a comprehensive summary:
 
-    # Combine all research with proper formatting
-    market_findings = ""
-    if findings["market_size"]:
-        market_findings += f"# Market Size and Growth\n{findings['market_size']}\n\n"
-    if findings["key_players"]:
-        market_findings += f"# Key Players and Companies\n{findings['key_players']}\n\n"
-    if findings["market_trends"]:
-        market_findings += f"# Market Trends and Developments\n{findings['market_trends']}\n\n"
-
-    research_data = f"""# Comprehensive Research Data: {topic}
-
-## Market Research Findings
-{market_findings if market_findings.strip() else "No market research data available."}
-
-## Technical Research Findings
-{findings["tech_findings"] if findings["tech_findings"].strip() else "No technical research data available."}
-"""
-
-    print("\nGenerating executive summary...")
-    if memory.get_summary():
-        print("Executive summary already exists, skipping...")
-    else:
-        query = f"""Based on the research data below, create an executive summary for {topic}.
-            Use ONLY the information provided in the research data.
+            MARKET OVERVIEW
+            [Summarize market size, growth potential, and key dynamics]
             
-            {research_data}
+            COMPETITIVE LANDSCAPE
+            [Detail key players, market shares, and competitive advantages]
             
-            Format your response exactly like this:
-            <SUMMARY>
-            # Executive Summary
-            [Write a concise overview based on the research data]
-
-            # Key Findings
-            [List 3-5 specific findings from the research data]
-            - [Include specific numbers and facts]
-            - [Include company names and market positions]
-            - [Include technical capabilities and innovations]
-
-            # Market Opportunities
-            [List 2-3 specific opportunities from the research]
-            - [Base these on actual market gaps or trends found]
-            - [Include technical opportunities identified]
-
-            # Recommendations
-            [List 3-4 actionable recommendations]
-            - [Base these on the research findings]
+            MARKET TRENDS
+            [List major trends, challenges, and opportunities]
+            
+            TECHNICAL ANALYSIS
+            [Summarize key technical findings and considerations]
+            
+            RECOMMENDATIONS
+            [Provide strategic recommendations]
+            
+            Format the response as:
+            SUMMARY_START
+            [Your comprehensive summary here, organized in sections]
+            - [Include specific data points and metrics]
             - [Include specific technical or market-focused actions]
             SUMMARY_COMPLETE
             """
-        await user_proxy.a_initiate_chat(research_agent, message=query)
+        results = await run_team_research(query, user_proxy, research_lead, manager)
 
         # Extract and verify summary
-        summary_content = extract_summary(user_proxy.chat_messages[research_agent])
+        summary_content = extract_summary(results)
         if not summary_content:
             print("Error: Failed to generate summary")
             return
 
-        # Save summary and generate final report
-        memory.save_summary(summary_content, research_data)
-    
-    # Write markdown report
-    print("\nWriting final report...")
-    report_file = write_summary_to_file(
-        memory.get_summary(),
-        research_data,
-        topic,
-        market_findings,
-        findings["tech_findings"]
-    )
+        # Write report
+        write_summary_to_file(summary_content, report_file)
+        print("✓ Summary generation complete")
+
+    except Exception as e:
+        print(f"Error during research: {str(e)}")
+        return
+
     print(f"\nReport has been written to: {report_file}")
     print("\nResearch complete!")
+
+async def run_team_research(query: str, user_proxy, research_lead, manager) -> str:
+    """Run a research query through the multi-agent team."""
+    await user_proxy.a_initiate_chat(
+        research_lead,
+        message=f"""Please coordinate the research team to investigate: {query}
+        
+        Required steps:
+        1. Break down research objectives
+        2. Delegate specific tasks to team members
+        3. Review and validate findings
+        4. Synthesize final report
+        
+        END RESEARCH with 'TERMINATE' when complete.""",
+        manager=manager
+    )
+    return research_lead.last_message()["content"]
 
 if __name__ == "__main__":
     import asyncio

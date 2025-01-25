@@ -4,12 +4,13 @@ from typing import Optional, Dict, List
 from pathlib import Path
 
 class ResearchMemory:
-    def __init__(self, topic: str):
-        """Initialize research memory with JSON storage"""
-        self.topic = topic
+    """Manages research findings and maintains state between research phases."""
+    
+    def __init__(self):
+        """Initialize research memory"""
         self.memory_dir = Path("research_memory")
         self.memory_dir.mkdir(exist_ok=True)
-        self.memory_file = self.memory_dir / f"research_{topic.replace(' ', '_').lower()}.json"
+        self.memory_file = self.memory_dir / "research_memory.json"
         self.memory = self._load_memory()
     
     def _load_memory(self) -> Dict:
@@ -18,12 +19,11 @@ class ResearchMemory:
             with open(self.memory_file, 'r') as f:
                 return json.load(f)
         return {
-            "market_size": "",
-            "key_players": "",
-            "market_trends": "",
-            "tech_findings": "",
-            "summary": "",
-            "detailed_report": ""
+            "market_size": None,
+            "competitors": None,
+            "trends": None,
+            "technical": None,
+            "summary": None
         }
     
     def _save_memory(self) -> None:
@@ -31,56 +31,31 @@ class ResearchMemory:
         with open(self.memory_file, 'w') as f:
             json.dump(self.memory, f, indent=2)
     
-    def save_market_size(self, content: str) -> None:
-        """Save market size findings to memory"""
-        self.memory["market_size"] = content
+    def add_market_size_data(self, data: str):
+        """Add market size research data."""
+        self.memory["market_size"] = data
         self._save_memory()
     
-    def save_key_players(self, content: str) -> None:
-        """Save key players findings to memory"""
-        self.memory["key_players"] = content
+    def add_competitor_data(self, data: str):
+        """Add competitor research data."""
+        self.memory["competitors"] = data
         self._save_memory()
     
-    def save_market_trends(self, content: str) -> None:
-        """Save market trends findings to memory"""
-        self.memory["market_trends"] = content
+    def add_trend_data(self, data: str):
+        """Add market trend research data."""
+        self.memory["trends"] = data
         self._save_memory()
     
-    def save_tech_findings(self, content: str) -> None:
-        """Save technical findings to memory"""
-        self.memory["tech_findings"] = content
+    def add_technical_data(self, data: str):
+        """Add technical research data."""
+        self.memory["technical"] = data
         self._save_memory()
     
-    def save_summary(self, summary: str, detailed_report: str) -> None:
-        """Save summary and detailed report to memory"""
+    def add_summary(self, summary: str):
+        """Add summary."""
         self.memory["summary"] = summary
-        self.memory["detailed_report"] = detailed_report
         self._save_memory()
     
-    def get_market_size(self) -> str:
-        """Get market size findings from memory"""
-        return self.memory.get("market_size", "")
-    
-    def get_key_players(self) -> str:
-        """Get key players findings from memory"""
-        return self.memory.get("key_players", "")
-    
-    def get_market_trends(self) -> str:
-        """Get market trends findings from memory"""
-        return self.memory.get("market_trends", "")
-    
-    def get_tech_findings(self) -> str:
-        """Get technical findings from memory"""
-        return self.memory.get("tech_findings", "")
-    
-    def get_summary(self) -> str:
-        """Get executive summary from memory"""
-        return self.memory.get("summary", "")
-    
-    def get_detailed_report(self) -> str:
-        """Get detailed report from memory"""
-        return self.memory.get("detailed_report", "")
-    
-    def get_all_findings(self) -> Dict[str, str]:
-        """Get all research findings"""
+    def get_all_findings(self) -> dict:
+        """Get all research findings."""
         return self.memory.copy()
