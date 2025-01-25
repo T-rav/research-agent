@@ -36,7 +36,7 @@ async def run_product_research(topic: str):
     print(f"\nResearching topic: {topic}")
     
     # Initialize memory and report generator
-    memory = ResearchMemory()
+    memory = ResearchMemory(topic)
     report_file = f"reports/{datetime.now().strftime('%Y%m%d_%H%M%S')}_{topic.replace(' ', '_')}.md"
     
     try:
@@ -62,110 +62,131 @@ async def run_product_research(topic: str):
         manager = autogen.GroupChatManager(groupchat=groupchat)
         
         # Market Size Research
-        print("\nResearching market size and opportunity...")
-        query = f"""Research the market size and growth potential for {topic}:
-            - Total addressable market (TAM)
-            - Current market value and CAGR
-            - Regional market breakdown
-            - Key growth drivers and market dynamics
-            
-            Prioritize data from industry reports, market research firms, and financial analyses."""
-        results = await run_team_research(query, user_proxy, research_lead, manager)
-        market_size = extract_findings(results)
-        if not market_size:
-            print("Warning: No market size data found")
+        if not memory.has_market_size_data():
+            print("\nResearching market size and opportunity...")
+            query = f"""Research the market size and growth potential for {topic}:
+                - Total addressable market (TAM)
+                - Current market value and CAGR
+                - Regional market breakdown
+                - Key growth drivers and market dynamics
+                
+                Prioritize data from industry reports, market research firms, and financial analyses."""
+            results = await run_team_research(query, user_proxy, research_lead, manager)
+            market_size = extract_findings(results)
+            if not market_size:
+                print("Warning: No market size data found")
+            else:
+                memory.add_market_size_data(market_size)
+                print("✓ Market size research complete")
         else:
-            memory.add_market_size_data(market_size)
-            print("✓ Market size research complete")
+            print("\nSkipping market size research - data already exists")
+            print(f"Last updated: {memory.get_last_updated('market_size')}")
 
         # Key Players Research
-        print("\nResearching key players and competitive landscape...")
-        query = f"""Analyze the competitive landscape for {topic}:
-            - Market leaders and their market share
-            - Key differentiators and value propositions
-            - Business models and pricing strategies
-            - Strategic partnerships and acquisitions
-            
-            Focus on company reports, investor presentations, and industry analyses."""
-        results = await run_team_research(query, user_proxy, research_lead, manager)
-        key_players = extract_findings(results)
-        if not key_players:
-            print("Warning: No key players data found")
+        if not memory.has_competitor_data():
+            print("\nResearching key players and competitive landscape...")
+            query = f"""Analyze the competitive landscape for {topic}:
+                - Market leaders and their market share
+                - Key differentiators and value propositions
+                - Business models and pricing strategies
+                - Strategic partnerships and acquisitions
+                
+                Focus on company reports, investor presentations, and industry analyses."""
+            results = await run_team_research(query, user_proxy, research_lead, manager)
+            key_players = extract_findings(results)
+            if not key_players:
+                print("Warning: No key players data found")
+            else:
+                memory.add_competitor_data(key_players)
+                print("✓ Competitor research complete")
         else:
-            memory.add_competitor_data(key_players)
-            print("✓ Competitor research complete")
+            print("\nSkipping competitor research - data already exists")
+            print(f"Last updated: {memory.get_last_updated('competitors')}")
 
         # Market Trends Research
-        print("\nResearching market trends and dynamics...")
-        query = f"""Identify key market trends and dynamics in {topic}:
-            - Current and emerging trends
-            - Customer needs and pain points
-            - Regulatory environment and compliance
-            - Implementation challenges and solutions
-            
-            Use healthcare industry reports, regulatory documents, and market surveys."""
-        results = await run_team_research(query, user_proxy, research_lead, manager)
-        market_trends = extract_findings(results)
-        if not market_trends:
-            print("Warning: No market trends data found")
+        if not memory.has_trend_data():
+            print("\nResearching market trends and dynamics...")
+            query = f"""Identify key market trends and dynamics in {topic}:
+                - Current and emerging trends
+                - Customer needs and pain points
+                - Regulatory environment and compliance
+                - Implementation challenges and solutions
+                
+                Use healthcare industry reports, regulatory documents, and market surveys."""
+            results = await run_team_research(query, user_proxy, research_lead, manager)
+            market_trends = extract_findings(results)
+            if not market_trends:
+                print("Warning: No market trends data found")
+            else:
+                memory.add_trend_data(market_trends)
+                print("✓ Market trends research complete")
         else:
-            memory.add_trend_data(market_trends)
-            print("✓ Market trends research complete")
+            print("\nSkipping market trends research - data already exists")
+            print(f"Last updated: {memory.get_last_updated('trends')}")
 
         # Technical Research
-        print("\nConducting technical research...")
-        query = f"""Analyze the technical aspects of {topic}:
-            - Key technologies and platforms
-            - Technical requirements and standards
-            - Implementation considerations
-            - Patent and IP landscape
-            
-            Reference technical papers, patent databases, and product documentation."""
-        results = await run_team_research(query, user_proxy, research_lead, manager)
-        tech_findings = extract_findings(results)
-        if not tech_findings:
-            print("Warning: No technical research data found")
+        if not memory.has_technical_data():
+            print("\nConducting technical research...")
+            query = f"""Analyze the technical aspects of {topic}:
+                - Key technologies and platforms
+                - Technical requirements and standards
+                - Implementation considerations
+                - Patent and IP landscape
+                
+                Reference technical papers, patent databases, and product documentation."""
+            results = await run_team_research(query, user_proxy, research_lead, manager)
+            tech_findings = extract_findings(results)
+            if not tech_findings:
+                print("Warning: No technical research data found")
+            else:
+                memory.add_technical_data(tech_findings)
+                print("✓ Technical research complete")
         else:
-            memory.add_technical_data(tech_findings)
-            print("✓ Technical research complete")
+            print("\nSkipping technical research - data already exists")
+            print(f"Last updated: {memory.get_last_updated('technical')}")
 
         # Generate Summary
-        print("\nGenerating comprehensive summary...")
-        query = f"""Based on all research findings for {topic}, generate a comprehensive summary:
+        if not memory.has_summary():
+            print("\nGenerating comprehensive summary...")
+            query = f"""Based on all research findings for {topic}, generate a comprehensive summary:
 
-            MARKET OVERVIEW
-            [Summarize market size, growth potential, and key dynamics]
-            
-            COMPETITIVE LANDSCAPE
-            [Detail key players, market shares, and competitive advantages]
-            
-            MARKET TRENDS
-            [List major trends, challenges, and opportunities]
-            
-            TECHNICAL ANALYSIS
-            [Summarize key technical findings and considerations]
-            
-            RECOMMENDATIONS
-            [Provide strategic recommendations]
-            
-            Format the response as:
-            SUMMARY_START
-            [Your comprehensive summary here, organized in sections]
-            - [Include specific data points and metrics]
-            - [Include specific technical or market-focused actions]
-            SUMMARY_COMPLETE
-            """
-        results = await run_team_research(query, user_proxy, research_lead, manager)
+                MARKET OVERVIEW
+                [Summarize market size, growth potential, and key dynamics]
+                
+                COMPETITIVE LANDSCAPE
+                [Detail key players, market shares, and competitive advantages]
+                
+                MARKET TRENDS
+                [List major trends, challenges, and opportunities]
+                
+                TECHNICAL ANALYSIS
+                [Summarize key technical findings and considerations]
+                
+                RECOMMENDATIONS
+                [Provide strategic recommendations]
+                
+                Format the response as:
+                SUMMARY_START
+                [Your comprehensive summary here, organized in sections]
+                - [Include specific data points and metrics]
+                - [Include specific technical or market-focused actions]
+                SUMMARY_COMPLETE
+                """
+            results = await run_team_research(query, user_proxy, research_lead, manager)
 
-        # Extract and verify summary
-        summary_content = extract_summary(results)
-        if not summary_content:
-            print("Error: Failed to generate summary")
-            return
+            # Extract and verify summary
+            summary_content = extract_summary(results)
+            if not summary_content:
+                print("Error: Failed to generate summary")
+                return
 
-        # Write report
-        write_summary_to_file(summary_content, report_file)
-        print("✓ Summary generation complete")
+            # Write report
+            write_summary_to_file(summary_content, report_file)
+            memory.add_summary(summary_content)
+            print("✓ Summary generation complete")
+        else:
+            print("\nSkipping summary generation - summary already exists")
+            print(f"Last updated: {memory.get_last_updated('summary')}")
 
     except Exception as e:
         print(f"Error during research: {str(e)}")
