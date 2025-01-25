@@ -24,13 +24,24 @@ def perplexity_search(query: str, num_results: int = 2) -> List[Dict]:
     
     try:
         response = perplexity.search(query)
-        results = []
-        results.append({
+        print(f"Debug - Raw response: {response}")  # Debug line
+        
+        # Handle different response types
+        if isinstance(response, str):
+            text_response = response
+        elif isinstance(response, dict) and 'text' in response:
+            text_response = response['text']
+        elif isinstance(response, dict) and 'answer' in response:
+            text_response = response['answer']
+        else:
+            text_response = str(response)
+            
+        results = [{
             "title": "Perplexity Search Result",
             "link": "",
-            "snippet": response,
-            "body": response
-        })
+            "snippet": text_response,
+            "body": text_response
+        }]
         return results
     except Exception as e:
         print(f"Error in Perplexity search: {str(e)}")
