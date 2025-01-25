@@ -75,7 +75,7 @@ def extract_summary(messages):
                 return content.strip()
     return ""
 
-def write_summary_to_file(topic: str, market_findings: str, technical_findings: str, report_file: str) -> None:
+def write_summary_to_file(topic: str, market_findings: str, technical_findings: str, summary_content: str, report_file: str) -> None:
     """Write research summary to a markdown file."""
     try:
         # Create reports directory if it doesn't exist
@@ -89,6 +89,9 @@ def write_summary_to_file(topic: str, market_findings: str, technical_findings: 
 
 ## Technical Analysis
 {technical_findings}
+
+## Executive Summary
+{summary_content}
 """
         
         # Write to file

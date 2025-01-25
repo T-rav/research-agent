@@ -180,12 +180,12 @@ async def run_product_research(topic: str):
                 print("Error: Failed to generate summary")
                 return
 
-            # Split findings into market and technical sections
+            # Get findings from memory
             market_findings = memory.get_market_findings()
             technical_findings = memory.get_technical_findings()
 
             # Write report and save to memory
-            write_summary_to_file(topic, market_findings, technical_findings, report_file)
+            write_summary_to_file(topic, market_findings, technical_findings, summary_content, report_file)
             memory.add_summary(summary_content)
             print("✓ Summary generation complete")
         else:
