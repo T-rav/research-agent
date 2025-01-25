@@ -60,28 +60,75 @@ class ResearchMemory:
         """Check if summary exists and is not empty"""
         return bool(self.memory.get("summary"))
     
-    def extract_sources(self, text: str) -> List[str]:
+    def extract_sources(self, text: str) -> List[Dict[str, str]]:
         """Extract URLs and citations from text."""
         sources = []
-        # URL pattern
-        url_pattern = r'https?://(?:[-\w.]|(?:%[\da-fA-F]{2}))+'
-        urls = re.findall(url_pattern, text)
-        sources.extend(urls)
         
-        # Citation patterns
-        citation_patterns = [
-            r'doi:\s*(10\.\d{4,}/[-._;()/:\w]+)',  # DOI
-            r'arXiv:\s*(\d{4}\.\d{4,})',  # arXiv
-            r'(?:Gartner|Forrester|IDC|McKinsey|Deloitte|PwC|KPMG|EY)\s+(?:Report|Study|Analysis|Survey)[\s,]+\d{4}',  # Market reports
-            r'Patent\s+([A-Z]{2}\d+[A-Z]\d+)'  # Patents
+        # URL patterns
+        url_pattern = r'<(https?://[^>\s]+)>'  # URLs in angle brackets
+        bare_url_pattern = r'(?<![<\w])(https?://(?:[-\w.]|(?:%[\da-fA-F]{2}))+)(?![>\w])'  # URLs not in brackets
+        
+        # Extract URLs in angle brackets
+        urls = re.findall(url_pattern, text)
+        sources.extend([{"type": "url", "url": url, "citation": None} for url in urls])
+        
+        # Extract bare URLs
+        bare_urls = re.findall(bare_url_pattern, text)
+        sources.extend([{"type": "url", "url": url, "citation": None} for url in bare_urls])
+        
+        # Extract formatted citations with URLs
+        citation_pattern = r'\[(\d+)\]\s+([^<\n]+)<(https?://[^>\s]+)>'
+        citations = re.findall(citation_pattern, text, re.MULTILINE)
+        for ref_num, citation_text, url in citations:
+            sources.append({
+                "type": "citation",
+                "url": url,
+                "citation": citation_text.strip(),
+                "reference_number": ref_num
+            })
+        
+        # Academic citation patterns
+        academic_patterns = [
+            (r'doi:\s*(10\.\d{4,}/[-._;()/:\w]+)', 'doi'),  # DOI
+            (r'arXiv:\s*(\d{4}\.\d{4,})', 'arxiv'),  # arXiv
+            (r'(?:Gartner|Forrester|IDC|McKinsey|Deloitte|PwC|KPMG|EY)\s+(?:Report|Study|Analysis|Survey)[\s,]+(\d{4})', 'report'),  # Market reports
+            (r'Patent\s+([A-Z]{2}\d+[A-Z]\d+)', 'patent')  # Patents
         ]
         
-        for pattern in citation_patterns:
-            citations = re.findall(pattern, text)
-            sources.extend(citations)
-            
-        return list(set(sources))  # Remove duplicates
+        for pattern, source_type in academic_patterns:
+            matches = re.findall(pattern, text, re.IGNORECASE)
+            for match in matches:
+                sources.append({
+                    "type": source_type,
+                    "identifier": match,
+                    "citation": None
+                })
+        
+        # Remove duplicates while preserving citation information
+        unique_sources = {}
+        for source in sources:
+            key = source.get("url") or source.get("identifier")
+            if key and (key not in unique_sources or source.get("citation")):
+                unique_sources[key] = source
+                
+        return list(unique_sources.values())
 
+    def format_source_for_report(self, source: Dict[str, str]) -> str:
+        """Format a source for the report."""
+        if source["type"] == "citation":
+            return f"[{source['reference_number']}] {source['citation']} {source['url']}"
+        elif source["type"] == "url":
+            return source["url"]
+        elif source["type"] == "doi":
+            return f"DOI: {source['identifier']}"
+        elif source["type"] == "arxiv":
+            return f"arXiv: {source['identifier']}"
+        elif source["type"] == "report":
+            return f"Market Report ({source['identifier']})"
+        elif source["type"] == "patent":
+            return f"Patent {source['identifier']}"
+        return str(source)
+    
     def add_market_size_data(self, data: str):
         """Add market size research data if not already present."""
         if not self.has_market_size_data():
@@ -142,7 +189,7 @@ class ResearchMemory:
         """Get when a section was last updated."""
         return self.memory.get("_last_updated", {}).get(section)
     
-    def get_all_sources(self) -> Dict[str, List[str]]:
+    def get_all_sources(self) -> Dict[str, List[Dict[str, str]]]:
         """Get all sources used in the research."""
         return self.memory.get("sources", {})
     

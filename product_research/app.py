@@ -186,7 +186,14 @@ async def run_product_research(topic: str):
             sources = memory.get_all_sources()
 
             # Write report and save to memory
-            write_summary_to_file(topic, market_findings, technical_findings, summary_content, report_file, sources)
+            write_summary_to_file(
+                topic=topic,
+                market_findings=market_findings,
+                technical_findings=technical_findings,
+                summary_content=summary_content,
+                report_file=report_file,
+                sources=sources
+            )
             memory.add_summary(summary_content)
             print("✓ Summary generation complete")
         else:
