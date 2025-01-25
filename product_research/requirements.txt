@@ -3,3 +3,4 @@ python-dotenv
 arxiv
 perplexityai
 requests
+mem0ai

@@ -2,6 +2,7 @@
 OAI_CONFIG_LIST
 summaries/
 reports/
+research_memory/
 .cache/
 
 # Byte-compiled / optimized / DLL files

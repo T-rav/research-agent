@@ -3,13 +3,25 @@ from autogen import AssistantAgent, UserProxyAgent
 from .search_engines import perplexity_search, arxiv_search
 
 def create_agents():
-    """Create and configure the research and user proxy agents"""
+    """Create and configure the research and user proxy agents.
+    
+    This function sets up two agents: a research agent and a user proxy agent.
+    The research agent is responsible for conducting market and technical research
+    using the Perplexity AI and Arxiv search functions. It is configured with a low
+    temperature for deterministic responses and is specialized in formatting and 
+    presenting structured findings.
+    
+    The user proxy agent is configured to handle user interactions automatically,
+    with a set limit on consecutive auto-replies and a termination condition based
+    on message content. It utilizes the same configuration list for consistency and
+    has a defined function map for executing specific search functions.
+    """
     
     # Configure the OpenAI API
     config_list = autogen.config_list_from_json(
         "OAI_CONFIG_LIST",
         filter_dict={
-            "model": ["gpt-4-1106-preview"],
+            "model": ["gpt-4o-mini"],
         },
     )
 
@@ -19,7 +31,7 @@ def create_agents():
         llm_config={
             "config_list": config_list,
             "temperature": 0.1,
-            "model": "gpt-4-1106-preview",
+            "model": "gpt-4o-mini",
             "functions": [{
                 "name": "perplexity_search",
                 "description": "Search using Perplexity AI",
@@ -43,8 +55,7 @@ def create_agents():
         Always follow these steps:
         1. Call perplexity_search with the query
         2. Wait for the results
-        3. Format the findings with the <FINDINGS> tag
-        4. End with TERMINATE
+        3. Format your response in a clear, structured way with specific data points
         """
     )
 
@@ -57,7 +68,7 @@ def create_agents():
         code_execution_config=False,
         llm_config={
             "config_list": config_list,
-            "model": "gpt-4-1106-preview",
+            "model": "gpt-4o-mini",
             "timeout": 120
         },
         function_map={
