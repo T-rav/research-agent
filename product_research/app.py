@@ -85,57 +85,68 @@ config_list = autogen.config_list_from_json(
 # Create agents
 perplexity_search_agent = AssistantAgent(
     name="Perplexity_Search_Agent",
-    llm_config={"config_list": config_list},
-    system_message="""You are a helpful AI assistant that can search for information using Perplexity AI.
-    When asked for information, use the perplexity_search function to gather market research data.
-    Format your response as follows:
-    1. Start with "<FINDINGS>"
-    2. Present your findings in a clear, structured format with sections
-    3. End with "TERMINATE"
+    llm_config={
+        "config_list": config_list,
+        "functions": [
+            {
+                "name": "perplexity_search",
+                "description": "Search using Perplexity AI",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {"type": "string"},
+                        "num_results": {"type": "integer", "default": 3}
+                    },
+                    "required": ["query"]
+                }
+            }
+        ]
+    },
+    system_message="""You are a search agent. Your ONLY task is to:
+    1. Call perplexity_search with the user's query
+    2. Format the results in a structured way
+    3. Never use your own knowledge, only use search results
     
-    Example format:
+    Example:
+    User: Search for X
+    You: Let me search for that information.
+    *calls perplexity_search with appropriate query*
     <FINDINGS>
-    # Market Overview
-    [Your content here]
-    
-    # Key Players
-    [Your content here]
-    
-    # Market Trends
-    [Your content here]
-    
-    # Competitive Analysis
-    [Your content here]
-    TERMINATE
-    """
+    [Format the search results here]
+    TERMINATE"""
 )
 
 arxiv_search_agent = AssistantAgent(
     name="Arxiv_Search_Agent",
-    llm_config={"config_list": config_list},
-    system_message="""You are a helpful AI assistant that can search for academic papers on arXiv.
-    When asked for papers, use the arxiv_search function to gather technical research data.
-    Format your response as follows:
-    1. Start with "<FINDINGS>"
-    2. Present your findings in a clear, structured format with sections
-    3. Include paper citations and key insights
-    4. End with "TERMINATE"
+    llm_config={
+        "config_list": config_list,
+        "functions": [
+            {
+                "name": "arxiv_search",
+                "description": "Search arXiv papers",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {"type": "string"},
+                        "max_results": {"type": "integer", "default": 5}
+                    },
+                    "required": ["query"]
+                }
+            }
+        ]
+    },
+    system_message="""You are a search agent. Your ONLY task is to:
+    1. Call arxiv_search with the user's query
+    2. Format the results in a structured way
+    3. Never use your own knowledge, only use search results
     
-    Example format:
+    Example:
+    User: Search for X
+    You: Let me search for that information.
+    *calls arxiv_search with appropriate query*
     <FINDINGS>
-    # Technical Innovations
-    [Your content here]
-    
-    # Research Trends
-    [Your content here]
-    
-    # Key Papers and Findings
-    [Your content here with proper citations]
-    
-    # Future Directions
-    [Your content here]
-    TERMINATE
-    """
+    [Format the search results here]
+    TERMINATE"""
 )
 
 product_strategy_agent = AssistantAgent(
@@ -213,113 +224,83 @@ def write_summary_to_file(summary: str, detailed_report: str, topic: str, market
 # Function to run the literature review
 async def run_product_research(topic: str):
     """
-    Run a literature review on the given topic
+    Run product research on the given topic
     """
-    print(f"Starting literature review on topic: {topic}")
+    print(f"Starting product research on topic: {topic}")
     
-    # Create a group chat
-    groupchat = GroupChat(
-        agents=[perplexity_search_agent, arxiv_search_agent, product_strategy_agent],
-        messages=[],
-        max_round=12
-    )
-
     # Create a user proxy agent
     user_proxy = UserProxyAgent(
         name="User_Proxy",
         human_input_mode="NEVER",
         max_consecutive_auto_reply=10,
         is_termination_msg=lambda x: isinstance(x.get("content", ""), str) and x.get("content", "").rstrip().endswith("TERMINATE"),
-        code_execution_config={
-            "work_dir": "product_research",
-            "use_docker": False,
-            "last_n_messages": 3,
-            "timeout": 60
-        },
+        code_execution_config=False,
         llm_config={
             "config_list": config_list,
             "timeout": 120
-        },
-        function_map={
-            "perplexity_search": perplexity_search,
-            "arxiv_search": arxiv_search,
         }
     )
 
-    # Start the group chat
-    print("Phase 1: Market Research")
-    await user_proxy.a_initiate_chat(
-        perplexity_search_agent,
-        message=f"Research market trends and competitors for {topic}. Use perplexity_search to gather information."
+    # Phase 1: Market Research
+    print("\nPhase 1: Market Research")
+    market_data = await user_proxy.a_execute_function(
+        function_name="perplexity_search",
+        arguments={
+            "query": f"market analysis and trends for {topic}",
+            "num_results": 3
+        }
     )
-
-    # Extract findings from market research
-    market_findings = ""
-    for msg in user_proxy.chat_messages[perplexity_search_agent]:
-        content = msg.get("content", "")
-        if msg["role"] == "assistant" and isinstance(content, str) and "FINDINGS" in content:
-            start = content.find("<FINDINGS>") + len("<FINDINGS>")
-            end = content.find("TERMINATE")
-            if end != -1:
-                market_findings = content[start:end].strip()
-                break
-
+    
+    # Phase 2: Technical Research
     print("\nPhase 2: Technical Research")
-    await user_proxy.a_initiate_chat(
-        arxiv_search_agent,
-        message=f"Research technical aspects and innovations for {topic}. Use arxiv_search to find relevant papers."
+    technical_data = await user_proxy.a_execute_function(
+        function_name="arxiv_search",
+        arguments={
+            "query": f"technical research and innovations in {topic}",
+            "max_results": 5
+        }
     )
+    
+    # Combine research data
+    research_data = f"""
+Market Research Data:
+{market_data}
 
-    # Extract findings from technical research
-    technical_findings = ""
-    for msg in user_proxy.chat_messages[arxiv_search_agent]:
-        content = msg.get("content", "")
-        if msg["role"] == "assistant" and isinstance(content, str) and "FINDINGS" in content:
-            start = content.find("<FINDINGS>") + len("<FINDINGS>")
-            end = content.find("TERMINATE")
-            if end != -1:
-                technical_findings = content[start:end].strip()
-                break
-
-    # Combine market and technical findings
-    combined_findings = f"""
-Market Research Findings:
-{market_findings}
-
-Technical Research Findings:
-{technical_findings}
+Technical Research Data:
+{technical_data}
 """
-
+    
+    # Phase 3: Generate Summary
     print("\nPhase 3: Product Strategy")
     await user_proxy.a_initiate_chat(
         product_strategy_agent,
-        message=f"Based on this research, create an executive summary for {topic}:\n\n{combined_findings}"
+        message=f"Based on this research, create an executive summary for {topic}:\n\n{research_data}"
     )
 
-    # Extract executive summary
+    # Extract and write summary
     summary_content = ""
     for msg in user_proxy.chat_messages[product_strategy_agent]:
         content = msg.get("content", "")
-        if msg["role"] == "assistant" and isinstance(content, str) and "SUMMARY" in content:
+        if msg["role"] == "assistant" and isinstance(content, str) and "<SUMMARY>" in content:
             start = content.find("<SUMMARY>") + len("<SUMMARY>")
             end = content.find("SUMMARY_COMPLETE")
             if end != -1:
                 summary_content = content[start:end].strip()
                 break
 
-    # Write both summary and report to files
-    if summary_content and combined_findings:
-        print("\nDebug: About to write files...")
-        print(f"Debug: Summary content exists: {bool(summary_content)}")
-        print(f"Debug: Detailed report exists: {bool(combined_findings)}")
-        report_file = write_summary_to_file(summary_content, "", topic, market_findings, technical_findings)
-        print(f"\nCombined report has been written to: {report_file}")
-        print("\nExecutive Summary:")
-        print("-" * 80)
-        print(summary_content)
-        print("-" * 80)
+    # Write report
+    if summary_content:
+        print("\nWriting final report...")
+        report_file = write_summary_to_file(
+            summary_content, 
+            "", 
+            topic, 
+            str(market_data), 
+            str(technical_data)
+        )
+        print(f"\nReport has been written to: {report_file}")
     else:
-        print("\nNo summary or report was generated.")
+        print("\nError: Failed to generate report")
 
 if __name__ == "__main__":
     import asyncio
