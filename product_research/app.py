@@ -26,7 +26,7 @@ async def run_product_research(topic: str):
     else:
         query = f"""Search for market size information about {topic}.
             
-            Use this exact query: "What is the current market size and growth rate of AI code generation and AI programming assistants? Include specific revenue numbers, growth rates, and market projections."
+            Find current market size, growth rate, and market projections. Include specific revenue numbers and growth rates.
             
             Format your response with specific numbers and data points."""
         await user_proxy.a_initiate_chat(research_agent, message=query)
@@ -43,7 +43,7 @@ async def run_product_research(topic: str):
     else:
         query = f"""Search for information about key players in {topic}.
             
-            Use this exact query: "Who are the major companies and startups in AI code generation and AI programming tools? Include market share, revenue, funding, and notable products."
+            Find major companies and startups in this field. Include market share, revenue, funding, and notable products or services.
             
             Format your response with specific company details."""
         await user_proxy.a_initiate_chat(research_agent, message=query)
@@ -60,7 +60,7 @@ async def run_product_research(topic: str):
     else:
         query = f"""Search for market trends in {topic}.
             
-            Use this exact query: "What are the latest market trends and developments in AI code generation and AI programming assistants? Include adoption rates, user statistics, and industry shifts."
+            Find the latest market trends and developments. Include adoption rates, user statistics, and industry shifts.
             
             Format your response with specific trend analysis."""
         await user_proxy.a_initiate_chat(research_agent, message=query)
@@ -77,7 +77,7 @@ async def run_product_research(topic: str):
     else:
         query = f"""Search for technical innovations in {topic}.
             
-            Use this exact query: "What are the latest technical innovations and breakthroughs in AI code generation and programming AI? Include specific model architectures, performance metrics, and technical capabilities."
+            Find the latest technical innovations and breakthroughs. Include specific technologies, performance metrics, and technical capabilities.
             
             Format your response with specific technical details."""
         await user_proxy.a_initiate_chat(research_agent, message=query)
