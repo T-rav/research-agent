@@ -88,122 +88,217 @@ config_list = autogen.config_list_from_json(
 )
 
 # Create agents
-perplexity_search_agent = AssistantAgent(
-    name="Perplexity_Search_Agent",
+research_agent = AssistantAgent(
+    name="Research_Agent",
     llm_config={
         "config_list": config_list,
-        "functions": [
-            {
-                "name": "perplexity_search",
-                "description": "Search using Perplexity AI",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "query": {"type": "string"},
-                        "num_results": {"type": "integer", "default": 3}
-                    },
-                    "required": ["query"]
-                }
+        "temperature": 0.1,
+        "functions": [{
+            "name": "perplexity_search",
+            "description": "Search using Perplexity AI",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string"},
+                    "num_results": {"type": "integer", "default": 3}
+                },
+                "required": ["query"]
             }
-        ]
+        }]
     },
-    system_message="""You are a market research agent. Your task is to:
-    1. Use perplexity_search to find market information about AI and technology
-    2. Format the results in a clear structure
-    3. Only use information from the search results
+    system_message="""You are a research agent specializing in market and technical research.
+    Your task is to:
+    1. Call perplexity_search with the given query
+    2. Analyze the search results
+    3. Format the findings in a clear, structured way
+    4. Include specific numbers, statistics, and quotes when available
     
-    When searching:
-    1. Break down your search into specific aspects (market size, trends, players)
-    2. Use clear, focused queries like:
-       - "What is the current market size and growth rate of AI code generation?"
-       - "Who are the major companies and startups in AI code generation?"
-       - "What are the latest trends in AI code generation market?"
-    3. If you get an error, try a simpler query
+    Always follow these steps:
+    1. Call perplexity_search with the query
+    2. Wait for the results
+    3. Format the findings with the <FINDINGS> tag
+    4. End with TERMINATE
     
-    Format your findings like this:
+    Example:
+    Human: Research market size of X
+    Assistant: I'll search for market size information.
+    {
+        "function": "perplexity_search",
+        "arguments": {
+            "query": "What is the current market size and growth rate of X industry? Include specific numbers and data"
+        }
+    }
     <FINDINGS>
-    # Market Overview
-    [Market size, growth rates, and key statistics]
+    Based on the search results:
     
-    # Key Players
-    [Major companies, market leaders, and notable startups]
+    Market Size:
+    - Current value: $X billion (2023)
+    - CAGR: X% (2023-2028)
+    - Projected value: $X billion by 2028
     
-    # Market Trends
-    [Current trends, emerging technologies, and market shifts]
-    
-    # Competitive Analysis
-    [Market dynamics, competitive advantages, and challenges]
+    Key Statistics:
+    - [Specific data point 1]
+    - [Specific data point 2]
     TERMINATE
     """
 )
 
-arxiv_search_agent = AssistantAgent(
-    name="Arxiv_Search_Agent",
+# Create a user proxy agent
+user_proxy = UserProxyAgent(
+    name="User_Proxy",
+    human_input_mode="NEVER",
+    max_consecutive_auto_reply=10,
+    is_termination_msg=lambda x: isinstance(x.get("content", ""), str) and x.get("content", "").rstrip().endswith("TERMINATE"),
+    code_execution_config=False,
     llm_config={
         "config_list": config_list,
-        "functions": [
-            {
-                "name": "arxiv_search",
-                "description": "Search arXiv papers",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "query": {"type": "string"},
-                        "max_results": {"type": "integer", "default": 5}
-                    },
-                    "required": ["query"]
-                }
-            }
-        ]
+        "timeout": 120
     },
-    system_message="""You are a search agent. Your ONLY task is to:
-    1. Call arxiv_search with the user's query
-    2. Format the results in a structured way
-    3. Never use your own knowledge, only use search results
-    
-    Example:
-    User: Search for X
-    You: Let me search for that information.
-    *calls arxiv_search with appropriate query*
-    <FINDINGS>
-    [Format the search results here]
-    TERMINATE"""
+    function_map={
+        "perplexity_search": perplexity_search,
+        "arxiv_search": arxiv_search
+    }
 )
 
-product_strategy_agent = AssistantAgent(
-    name="Product_Strategy_Agent",
-    llm_config={"config_list": config_list},
-    system_message="""You are a skilled product strategist that creates comprehensive executive summaries.
-    When creating a summary:
-    1. Start with "<SUMMARY>"
-    2. Include clear sections: Overview, Market Analysis, Technical Analysis, Opportunities, Challenges, and Recommendations
-    3. Be specific and actionable
-    4. End with "SUMMARY_COMPLETE"
-    
-    Example format:
-    <SUMMARY>
-    # Executive Summary
-    
-    ## Overview
-    [Your content here]
-    
-    ## Market Analysis
-    [Your content here]
-    
-    ## Technical Analysis
-    [Your content here]
-    
-    ## Opportunities
-    [Your content here]
-    
-    ## Challenges
-    [Your content here]
-    
-    ## Recommendations
-    [Your content here]
-    SUMMARY_COMPLETE
+# Function to run the literature review
+async def run_product_research(topic: str):
     """
-)
+    Run product research on the given topic
+    """
+    print(f"Starting product research on topic: {topic}")
+    
+    # Phase 1: Market Research
+    print("\nPhase 1: Market Research")
+    
+    # Get market size data
+    print("Researching market size...")
+    await user_proxy.a_initiate_chat(
+        research_agent,
+        message=f"""Search for market size information about {topic}.
+        
+        Use this exact query: "What is the current market size and growth rate of AI code generation and AI programming assistants? Include specific revenue numbers, growth rates, and market projections."
+        
+        Format your response with specific numbers and data points."""
+    )
+    market_size = extract_findings(user_proxy.chat_messages[research_agent])
+    if not market_size:
+        print("Warning: No market size data found")
+    
+    # Get key players data
+    print("Researching key players...")
+    await user_proxy.a_initiate_chat(
+        research_agent,
+        message=f"""Search for information about key players in {topic}.
+        
+        Use this exact query: "Who are the major companies and startups in AI code generation and AI programming tools? Include market share, revenue, funding, and notable products."
+        
+        Format your response with specific company details."""
+    )
+    key_players = extract_findings(user_proxy.chat_messages[research_agent])
+    if not key_players:
+        print("Warning: No key players data found")
+    
+    # Get market trends
+    print("Researching market trends...")
+    await user_proxy.a_initiate_chat(
+        research_agent,
+        message=f"""Search for market trends in {topic}.
+        
+        Use this exact query: "What are the latest market trends and developments in AI code generation and AI programming assistants? Include adoption rates, user statistics, and industry shifts."
+        
+        Format your response with specific trend analysis."""
+    )
+    market_trends = extract_findings(user_proxy.chat_messages[research_agent])
+    if not market_trends:
+        print("Warning: No market trends data found")
+
+    # Combine market research with proper formatting
+    market_findings = ""
+    if market_size:
+        market_findings += f"# Market Size and Growth\n{market_size}\n\n"
+    if key_players:
+        market_findings += f"# Key Players and Companies\n{key_players}\n\n"
+    if market_trends:
+        market_findings += f"# Market Trends and Developments\n{market_trends}\n\n"
+    
+    # Phase 2: Technical Research
+    print("\nPhase 2: Technical Research")
+    await user_proxy.a_initiate_chat(
+        research_agent,
+        message=f"""Search for technical innovations in {topic}.
+        
+        Use this exact query: "What are the latest technical innovations and breakthroughs in AI code generation and programming AI? Include specific model architectures, performance metrics, and technical capabilities."
+        
+        Format your response with specific technical details."""
+    )
+    tech_findings = extract_findings(user_proxy.chat_messages[research_agent])
+    if not tech_findings:
+        print("Warning: No technical research data found")
+
+    # Verify we have enough data to proceed
+    if not any([market_size, key_players, market_trends, tech_findings]):
+        print("\nError: No research data was collected. Please try again.")
+        return
+
+    # Combine all research with proper formatting
+    research_data = f"""# Comprehensive Research Data: {topic}
+
+## Market Research Findings
+{market_findings if market_findings.strip() else "No market research data available."}
+
+## Technical Research Findings
+{tech_findings if tech_findings.strip() else "No technical research data available."}
+"""
+
+    print("\nGenerating executive summary...")
+    await user_proxy.a_initiate_chat(
+        strategy_agent,
+        message=f"""Based on the research data below, create an executive summary for {topic}.
+        Use ONLY the information provided in the research data.
+        
+        {research_data}
+        
+        Format your response exactly like this:
+        <SUMMARY>
+        # Executive Summary
+        [Write a concise overview based on the research data]
+
+        # Key Findings
+        [List 3-5 specific findings from the research data]
+        - [Include specific numbers and facts]
+        - [Include company names and market positions]
+        - [Include technical capabilities and innovations]
+
+        # Market Opportunities
+        [List 2-3 specific opportunities from the research]
+        - [Base these on actual market gaps or trends found]
+        - [Include technical opportunities identified]
+
+        # Recommendations
+        [List 3-4 actionable recommendations]
+        - [Base these on the research findings]
+        - [Include specific technical or market-focused actions]
+        SUMMARY_COMPLETE
+        """
+    )
+
+    # Extract and verify summary
+    summary_content = extract_summary(user_proxy.chat_messages[strategy_agent])
+    if not summary_content:
+        print("Error: Failed to generate summary")
+        return
+
+    # Write report
+    print("\nWriting final report...")
+    report_file = write_summary_to_file(
+        summary_content,
+        research_data,
+        topic,
+        market_findings,
+        tech_findings
+    )
+    print(f"\nReport has been written to: {report_file}")
+    print("\nResearch complete!")
 
 def write_summary_to_file(summary: str, detailed_report: str, topic: str, market_findings: str, technical_findings: str):
     """
@@ -241,128 +336,6 @@ def write_summary_to_file(summary: str, detailed_report: str, topic: str, market
         f.write(report_content)
     
     return filename
-
-# Function to run the literature review
-async def run_product_research(topic: str):
-    """
-    Run product research on the given topic
-    """
-    print(f"Starting product research on topic: {topic}")
-    
-    # Create a user proxy agent
-    user_proxy = UserProxyAgent(
-        name="User_Proxy",
-        human_input_mode="NEVER",
-        max_consecutive_auto_reply=10,
-        is_termination_msg=lambda x: isinstance(x.get("content", ""), str) and x.get("content", "").rstrip().endswith("TERMINATE"),
-        code_execution_config=False,
-        llm_config={
-            "config_list": config_list,
-            "timeout": 120
-        },
-        function_map={
-            "perplexity_search": perplexity_search,
-            "arxiv_search": arxiv_search
-        }
-    )
-
-    # Phase 1: Market Research
-    print("\nPhase 1: Market Research")
-    market_data = []
-    
-    # Search for market size and growth
-    await user_proxy.a_initiate_chat(
-        perplexity_search_agent,
-        message=f"What is the current market size, value, and growth rate of {topic}? Include specific numbers and data."
-    )
-    market_size = extract_findings(user_proxy.chat_messages[perplexity_search_agent])
-    market_data.append(("Market Size and Growth", market_size))
-    
-    # Search for key players
-    await user_proxy.a_initiate_chat(
-        perplexity_search_agent,
-        message=f"Who are the major companies and key players in {topic}? List specific companies and their market positions."
-    )
-    key_players = extract_findings(user_proxy.chat_messages[perplexity_search_agent])
-    market_data.append(("Key Players", key_players))
-    
-    # Search for market trends
-    await user_proxy.a_initiate_chat(
-        perplexity_search_agent,
-        message=f"What are the latest market trends and developments in {topic}? Include recent changes and future predictions."
-    )
-    market_trends = extract_findings(user_proxy.chat_messages[perplexity_search_agent])
-    market_data.append(("Market Trends", market_trends))
-
-    # Combine market findings
-    market_findings = "\n\n".join([f"# {title}\n{data}" for title, data in market_data if data])
-
-    # Phase 2: Technical Research
-    print("\nPhase 2: Technical Research")
-    await user_proxy.a_initiate_chat(
-        arxiv_search_agent,
-        message=f"Find technical research papers about innovations and developments in {topic}."
-    )
-    tech_findings = extract_findings(user_proxy.chat_messages[arxiv_search_agent])
-
-    # Combine all research
-    research_data = f"""
-Market Research Findings:
-{market_findings}
-
-Technical Research Findings:
-{tech_findings}
-"""
-
-    # Phase 3: Generate Summary
-    print("\nPhase 3: Product Strategy")
-    await user_proxy.a_initiate_chat(
-        product_strategy_agent,
-        message=f"""Based on this research, create an executive summary for {topic}.
-        Focus on key findings, market opportunities, and actionable insights.
-        
-        Research Data:
-        {research_data}
-        
-        Format your response as:
-        <SUMMARY>
-        # Executive Summary
-        [High-level overview]
-
-        # Key Findings
-        [Bullet points of most important discoveries]
-
-        # Market Opportunities
-        [Identified opportunities and potential areas for growth]
-
-        # Recommendations
-        [Actionable steps and strategic recommendations]
-        SUMMARY_COMPLETE
-        """
-    )
-
-    # Extract summary
-    summary_content = extract_summary(user_proxy.chat_messages[product_strategy_agent])
-
-    # Write report
-    if summary_content and (market_findings or tech_findings):
-        print("\nWriting final report...")
-        report_file = write_summary_to_file(
-            summary_content,
-            "",
-            topic,
-            market_findings,
-            tech_findings
-        )
-        print(f"\nReport has been written to: {report_file}")
-    else:
-        print("\nError: Failed to generate complete report")
-        if not summary_content:
-            print("Missing: Executive Summary")
-        if not market_findings:
-            print("Missing: Market Research Findings")
-        if not tech_findings:
-            print("Missing: Technical Research Findings")
 
 def extract_findings(messages):
     """Extract findings from agent messages"""
