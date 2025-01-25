@@ -268,82 +268,123 @@ async def run_product_research(topic: str):
 
     # Phase 1: Market Research
     print("\nPhase 1: Market Research")
+    market_data = []
+    
+    # Search for market size and growth
     await user_proxy.a_initiate_chat(
         perplexity_search_agent,
-        message=f"""Use perplexity_search to find market research about {topic}.
-        Focus on market size, trends, and key players."""
+        message=f"What is the current market size, value, and growth rate of {topic}? Include specific numbers and data."
     )
+    market_size = extract_findings(user_proxy.chat_messages[perplexity_search_agent])
+    market_data.append(("Market Size and Growth", market_size))
+    
+    # Search for key players
+    await user_proxy.a_initiate_chat(
+        perplexity_search_agent,
+        message=f"Who are the major companies and key players in {topic}? List specific companies and their market positions."
+    )
+    key_players = extract_findings(user_proxy.chat_messages[perplexity_search_agent])
+    market_data.append(("Key Players", key_players))
+    
+    # Search for market trends
+    await user_proxy.a_initiate_chat(
+        perplexity_search_agent,
+        message=f"What are the latest market trends and developments in {topic}? Include recent changes and future predictions."
+    )
+    market_trends = extract_findings(user_proxy.chat_messages[perplexity_search_agent])
+    market_data.append(("Market Trends", market_trends))
 
-    # Extract market findings
-    market_findings = ""
-    for msg in user_proxy.chat_messages[perplexity_search_agent]:
-        content = msg.get("content", "")
-        if msg["role"] == "assistant" and isinstance(content, str) and "<FINDINGS>" in content:
-            start = content.find("<FINDINGS>") + len("<FINDINGS>")
-            end = content.find("TERMINATE")
-            if end != -1:
-                market_findings = content[start:end].strip()
-                break
+    # Combine market findings
+    market_findings = "\n\n".join([f"# {title}\n{data}" for title, data in market_data if data])
 
     # Phase 2: Technical Research
     print("\nPhase 2: Technical Research")
     await user_proxy.a_initiate_chat(
         arxiv_search_agent,
-        message=f"""Use arxiv_search to find technical research papers about {topic}.
-        Focus on recent innovations and technical trends."""
+        message=f"Find technical research papers about innovations and developments in {topic}."
     )
+    tech_findings = extract_findings(user_proxy.chat_messages[arxiv_search_agent])
 
-    # Extract technical findings
-    technical_findings = ""
-    for msg in user_proxy.chat_messages[arxiv_search_agent]:
-        content = msg.get("content", "")
-        if msg["role"] == "assistant" and isinstance(content, str) and "<FINDINGS>" in content:
-            start = content.find("<FINDINGS>") + len("<FINDINGS>")
-            end = content.find("TERMINATE")
-            if end != -1:
-                technical_findings = content[start:end].strip()
-                break
-
-    # Combine findings
+    # Combine all research
     research_data = f"""
 Market Research Findings:
 {market_findings}
 
 Technical Research Findings:
-{technical_findings}
+{tech_findings}
 """
 
     # Phase 3: Generate Summary
     print("\nPhase 3: Product Strategy")
     await user_proxy.a_initiate_chat(
         product_strategy_agent,
-        message=f"Based on this research, create an executive summary for {topic}:\n\n{research_data}"
+        message=f"""Based on this research, create an executive summary for {topic}.
+        Focus on key findings, market opportunities, and actionable insights.
+        
+        Research Data:
+        {research_data}
+        
+        Format your response as:
+        <SUMMARY>
+        # Executive Summary
+        [High-level overview]
+
+        # Key Findings
+        [Bullet points of most important discoveries]
+
+        # Market Opportunities
+        [Identified opportunities and potential areas for growth]
+
+        # Recommendations
+        [Actionable steps and strategic recommendations]
+        SUMMARY_COMPLETE
+        """
     )
 
     # Extract summary
-    summary_content = ""
-    for msg in user_proxy.chat_messages[product_strategy_agent]:
-        content = msg.get("content", "")
-        if msg["role"] == "assistant" and isinstance(content, str) and "<SUMMARY>" in content:
-            start = content.find("<SUMMARY>") + len("<SUMMARY>")
-            end = content.find("SUMMARY_COMPLETE")
-            if end != -1:
-                summary_content = content[start:end].strip()
-                break
+    summary_content = extract_summary(user_proxy.chat_messages[product_strategy_agent])
 
     # Write report
-    if summary_content and (market_findings or technical_findings):
+    if summary_content and (market_findings or tech_findings):
         print("\nWriting final report...")
         report_file = write_summary_to_file(
             summary_content,
             "",
             topic,
             market_findings,
-            technical_findings
+            tech_findings
         )
         print(f"\nReport has been written to: {report_file}")
     else:
         print("\nError: Failed to generate complete report")
+        if not summary_content:
+            print("Missing: Executive Summary")
+        if not market_findings:
+            print("Missing: Market Research Findings")
+        if not tech_findings:
+            print("Missing: Technical Research Findings")
+
+def extract_findings(messages):
+    """Extract findings from agent messages"""
+    for msg in messages:
+        content = msg.get("content", "")
+        if msg["role"] == "assistant" and isinstance(content, str) and "<FINDINGS>" in content:
+            start = content.find("<FINDINGS>") + len("<FINDINGS>")
+            end = content.find("TERMINATE")
+            if end != -1:
+                return content[start:end].strip()
+    return ""
+
+def extract_summary(messages):
+    """Extract summary from agent messages"""
+    for msg in messages:
+        content = msg.get("content", "")
+        if msg["role"] == "assistant" and isinstance(content, str) and "<SUMMARY>" in content:
+            start = content.find("<SUMMARY>") + len("<SUMMARY>")
+            end = content.find("SUMMARY_COMPLETE")
+            if end != -1:
+                return content[start:end].strip()
+    return ""
 
 if __name__ == "__main__":
     import asyncio
