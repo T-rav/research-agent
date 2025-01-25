@@ -3,6 +3,7 @@ import json
 from typing import Optional, Dict, List
 from pathlib import Path
 from datetime import datetime
+import re
 
 class ResearchMemory:
     """Manages research findings and maintains state between research phases."""
@@ -25,6 +26,12 @@ class ResearchMemory:
             "trends": None,
             "technical": None,
             "summary": None,
+            "sources": {
+                "market_size": [],
+                "competitors": [],
+                "trends": [],
+                "technical": []
+            },
             "_last_updated": {}  # Track when each section was last updated
         }
     
@@ -53,10 +60,33 @@ class ResearchMemory:
         """Check if summary exists and is not empty"""
         return bool(self.memory.get("summary"))
     
+    def extract_sources(self, text: str) -> List[str]:
+        """Extract URLs and citations from text."""
+        sources = []
+        # URL pattern
+        url_pattern = r'https?://(?:[-\w.]|(?:%[\da-fA-F]{2}))+'
+        urls = re.findall(url_pattern, text)
+        sources.extend(urls)
+        
+        # Citation patterns
+        citation_patterns = [
+            r'doi:\s*(10\.\d{4,}/[-._;()/:\w]+)',  # DOI
+            r'arXiv:\s*(\d{4}\.\d{4,})',  # arXiv
+            r'(?:Gartner|Forrester|IDC|McKinsey|Deloitte|PwC|KPMG|EY)\s+(?:Report|Study|Analysis|Survey)[\s,]+\d{4}',  # Market reports
+            r'Patent\s+([A-Z]{2}\d+[A-Z]\d+)'  # Patents
+        ]
+        
+        for pattern in citation_patterns:
+            citations = re.findall(pattern, text)
+            sources.extend(citations)
+            
+        return list(set(sources))  # Remove duplicates
+
     def add_market_size_data(self, data: str):
         """Add market size research data if not already present."""
         if not self.has_market_size_data():
             self.memory["market_size"] = data
+            self.memory["sources"]["market_size"] = self.extract_sources(data)
             self.memory["_last_updated"]["market_size"] = str(datetime.now())
             self._save_memory()
             return True
@@ -66,6 +96,7 @@ class ResearchMemory:
         """Add competitor research data if not already present."""
         if not self.has_competitor_data():
             self.memory["competitors"] = data
+            self.memory["sources"]["competitors"] = self.extract_sources(data)
             self.memory["_last_updated"]["competitors"] = str(datetime.now())
             self._save_memory()
             return True
@@ -75,6 +106,7 @@ class ResearchMemory:
         """Add market trend research data if not already present."""
         if not self.has_trend_data():
             self.memory["trends"] = data
+            self.memory["sources"]["trends"] = self.extract_sources(data)
             self.memory["_last_updated"]["trends"] = str(datetime.now())
             self._save_memory()
             return True
@@ -84,6 +116,7 @@ class ResearchMemory:
         """Add technical research data if not already present."""
         if not self.has_technical_data():
             self.memory["technical"] = data
+            self.memory["sources"]["technical"] = self.extract_sources(data)
             self.memory["_last_updated"]["technical"] = str(datetime.now())
             self._save_memory()
             return True
@@ -102,11 +135,16 @@ class ResearchMemory:
         """Get all research findings."""
         findings = self.memory.copy()
         findings.pop("_last_updated", None)  # Remove metadata before returning
+        findings.pop("sources", None)  # Remove sources before returning
         return findings
     
     def get_last_updated(self, section: str) -> Optional[str]:
         """Get when a section was last updated."""
         return self.memory.get("_last_updated", {}).get(section)
+    
+    def get_all_sources(self) -> Dict[str, List[str]]:
+        """Get all sources used in the research."""
+        return self.memory.get("sources", {})
     
     def get_market_findings(self) -> str:
         """Get all market-related findings."""
