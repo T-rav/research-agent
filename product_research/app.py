@@ -1,51 +1,56 @@
 import os
+import json
 from typing import List, Dict
 import autogen
-from autogen import AssistantAgent, UserProxyAgent, GroupChat
-from autogen.agentchat.contrib.text_analyzer_agent import TextAnalyzerAgent
-import requests
+from autogen import AssistantAgent, UserProxyAgent
 import arxiv
 from dotenv import load_dotenv
-import perplexityai
+from openai import OpenAI
 
 # Load environment variables
 load_dotenv()
 
-def perplexity_search(query: str, num_results: int = 2) -> List[Dict]:
+def perplexity_search(query: str, num_results: int = 2) -> str:
     """
-    Search using Perplexity AI API
+    Search using Perplexity AI API via OpenAI client
     """
     api_key = os.getenv("PERPLEXITY_API_KEY")
     if not api_key:
-        raise ValueError("Perplexity API key not found in environment variables")
+        return "Error: Perplexity API key not found in environment variables"
 
-    perplexity = perplexityai.Perplexity()
-    perplexity.token = api_key
-    
     try:
-        response = perplexity.search(query)
-        print(f"Debug - Raw response: {response}")  # Debug line
+        client = OpenAI(
+            api_key=api_key,
+            base_url="https://api.perplexity.ai"
+        )
         
-        # Handle different response types
-        if isinstance(response, str):
-            text_response = response
-        elif isinstance(response, dict) and 'text' in response:
-            text_response = response['text']
-        elif isinstance(response, dict) and 'answer' in response:
-            text_response = response['answer']
+        print(f"Debug: Sending query to Perplexity API: {query}")
+        response = client.chat.completions.create(
+            model="sonar-pro",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a helpful research assistant. Provide detailed, factual information with specific numbers and data when available."
+                },
+                {
+                    "role": "user",
+                    "content": query
+                }
+            ]
+        )
+        
+        if response.choices and len(response.choices) > 0:
+            result = response.choices[0].message.content
+            print(f"Debug: Got response: {result}")
+            return result
         else:
-            text_response = str(response)
+            return "No results found"
             
-        results = [{
-            "title": "Perplexity Search Result",
-            "link": "",
-            "snippet": text_response,
-            "body": text_response
-        }]
-        return results
     except Exception as e:
-        print(f"Error in Perplexity search: {str(e)}")
-        return []
+        print(f"Debug: Error in perplexity_search: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return f"Error in perplexity_search: {str(e)}"
 
 def arxiv_search(query: str, max_results: int = 2) -> str:
     """
@@ -102,18 +107,34 @@ perplexity_search_agent = AssistantAgent(
             }
         ]
     },
-    system_message="""You are a search agent. Your ONLY task is to:
-    1. Call perplexity_search with the user's query
-    2. Format the results in a structured way
-    3. Never use your own knowledge, only use search results
+    system_message="""You are a market research agent. Your task is to:
+    1. Use perplexity_search to find market information about AI and technology
+    2. Format the results in a clear structure
+    3. Only use information from the search results
     
-    Example:
-    User: Search for X
-    You: Let me search for that information.
-    *calls perplexity_search with appropriate query*
+    When searching:
+    1. Break down your search into specific aspects (market size, trends, players)
+    2. Use clear, focused queries like:
+       - "What is the current market size and growth rate of AI code generation?"
+       - "Who are the major companies and startups in AI code generation?"
+       - "What are the latest trends in AI code generation market?"
+    3. If you get an error, try a simpler query
+    
+    Format your findings like this:
     <FINDINGS>
-    [Format the search results here]
-    TERMINATE"""
+    # Market Overview
+    [Market size, growth rates, and key statistics]
+    
+    # Key Players
+    [Major companies, market leaders, and notable startups]
+    
+    # Market Trends
+    [Current trends, emerging technologies, and market shifts]
+    
+    # Competitive Analysis
+    [Market dynamics, competitive advantages, and challenges]
+    TERMINATE
+    """
 )
 
 arxiv_search_agent = AssistantAgent(
