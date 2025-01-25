@@ -58,27 +58,28 @@ class ResearchMemory:
         self._save_memory()
     
     def get_market_size(self) -> str:
-        """Retrieve market size findings"""
-        return self.memory["market_size"]
+        """Get market size findings from memory"""
+        return self.memory.get("market_size", "")
     
     def get_key_players(self) -> str:
-        """Retrieve key players findings"""
-        return self.memory["key_players"]
+        """Get key players findings from memory"""
+        return self.memory.get("key_players", "")
     
     def get_market_trends(self) -> str:
-        """Retrieve market trends findings"""
-        return self.memory["market_trends"]
+        """Get market trends findings from memory"""
+        return self.memory.get("market_trends", "")
     
     def get_tech_findings(self) -> str:
-        """Retrieve technical findings"""
-        return self.memory["tech_findings"]
+        """Get technical findings from memory"""
+        return self.memory.get("tech_findings", "")
     
-    def get_summary(self) -> Dict[str, str]:
-        """Retrieve summary and detailed report"""
-        return {
-            "summary": self.memory["summary"],
-            "detailed_report": self.memory["detailed_report"]
-        }
+    def get_summary(self) -> str:
+        """Get executive summary from memory"""
+        return self.memory.get("summary", "")
+    
+    def get_detailed_report(self) -> str:
+        """Get detailed report from memory"""
+        return self.memory.get("detailed_report", "")
     
     def get_all_findings(self) -> Dict[str, str]:
         """Get all research findings"""
