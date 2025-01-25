@@ -238,38 +238,60 @@ async def run_product_research(topic: str):
         llm_config={
             "config_list": config_list,
             "timeout": 120
+        },
+        function_map={
+            "perplexity_search": perplexity_search,
+            "arxiv_search": arxiv_search
         }
     )
 
     # Phase 1: Market Research
     print("\nPhase 1: Market Research")
-    market_data = await user_proxy.a_execute_function(
-        function_name="perplexity_search",
-        arguments={
-            "query": f"market analysis and trends for {topic}",
-            "num_results": 3
-        }
+    await user_proxy.a_initiate_chat(
+        perplexity_search_agent,
+        message=f"""Use perplexity_search to find market research about {topic}.
+        Focus on market size, trends, and key players."""
     )
-    
+
+    # Extract market findings
+    market_findings = ""
+    for msg in user_proxy.chat_messages[perplexity_search_agent]:
+        content = msg.get("content", "")
+        if msg["role"] == "assistant" and isinstance(content, str) and "<FINDINGS>" in content:
+            start = content.find("<FINDINGS>") + len("<FINDINGS>")
+            end = content.find("TERMINATE")
+            if end != -1:
+                market_findings = content[start:end].strip()
+                break
+
     # Phase 2: Technical Research
     print("\nPhase 2: Technical Research")
-    technical_data = await user_proxy.a_execute_function(
-        function_name="arxiv_search",
-        arguments={
-            "query": f"technical research and innovations in {topic}",
-            "max_results": 5
-        }
+    await user_proxy.a_initiate_chat(
+        arxiv_search_agent,
+        message=f"""Use arxiv_search to find technical research papers about {topic}.
+        Focus on recent innovations and technical trends."""
     )
-    
-    # Combine research data
-    research_data = f"""
-Market Research Data:
-{market_data}
 
-Technical Research Data:
-{technical_data}
+    # Extract technical findings
+    technical_findings = ""
+    for msg in user_proxy.chat_messages[arxiv_search_agent]:
+        content = msg.get("content", "")
+        if msg["role"] == "assistant" and isinstance(content, str) and "<FINDINGS>" in content:
+            start = content.find("<FINDINGS>") + len("<FINDINGS>")
+            end = content.find("TERMINATE")
+            if end != -1:
+                technical_findings = content[start:end].strip()
+                break
+
+    # Combine findings
+    research_data = f"""
+Market Research Findings:
+{market_findings}
+
+Technical Research Findings:
+{technical_findings}
 """
-    
+
     # Phase 3: Generate Summary
     print("\nPhase 3: Product Strategy")
     await user_proxy.a_initiate_chat(
@@ -277,7 +299,7 @@ Technical Research Data:
         message=f"Based on this research, create an executive summary for {topic}:\n\n{research_data}"
     )
 
-    # Extract and write summary
+    # Extract summary
     summary_content = ""
     for msg in user_proxy.chat_messages[product_strategy_agent]:
         content = msg.get("content", "")
@@ -289,18 +311,18 @@ Technical Research Data:
                 break
 
     # Write report
-    if summary_content:
+    if summary_content and (market_findings or technical_findings):
         print("\nWriting final report...")
         report_file = write_summary_to_file(
-            summary_content, 
-            "", 
-            topic, 
-            str(market_data), 
-            str(technical_data)
+            summary_content,
+            "",
+            topic,
+            market_findings,
+            technical_findings
         )
         print(f"\nReport has been written to: {report_file}")
     else:
-        print("\nError: Failed to generate report")
+        print("\nError: Failed to generate complete report")
 
 if __name__ == "__main__":
     import asyncio
