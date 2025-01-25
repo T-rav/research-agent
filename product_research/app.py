@@ -252,7 +252,7 @@ async def run_product_research(topic: str):
 
     print("\nGenerating executive summary...")
     await user_proxy.a_initiate_chat(
-        strategy_agent,
+        research_agent,
         message=f"""Based on the research data below, create an executive summary for {topic}.
         Use ONLY the information provided in the research data.
         
@@ -283,7 +283,7 @@ async def run_product_research(topic: str):
     )
 
     # Extract and verify summary
-    summary_content = extract_summary(user_proxy.chat_messages[strategy_agent])
+    summary_content = extract_summary(user_proxy.chat_messages[research_agent])
     if not summary_content:
         print("Error: Failed to generate summary")
         return
@@ -341,11 +341,17 @@ def extract_findings(messages):
     """Extract findings from agent messages"""
     for msg in messages:
         content = msg.get("content", "")
-        if msg["role"] == "assistant" and isinstance(content, str) and "<FINDINGS>" in content:
-            start = content.find("<FINDINGS>") + len("<FINDINGS>")
-            end = content.find("TERMINATE")
-            if end != -1:
-                return content[start:end].strip()
+        if msg["role"] == "assistant" and isinstance(content, str):
+            # First try to find content between tags
+            if "<FINDINGS>" in content:
+                start = content.find("<FINDINGS>") + len("<FINDINGS>")
+                end = content.find("TERMINATE")
+                if end != -1:
+                    return content[start:end].strip()
+            
+            # If no tags found but we got a response, return the whole content
+            if content.strip():
+                return content.strip()
     return ""
 
 def extract_summary(messages):
