@@ -31,9 +31,13 @@ async def run_product_research(topic: str):
     else:
         query = f"""Search for market size information about {topic}.
             
-            Find current market size as of {current_year}, growth rate, and market projections through {projection_year}. Include specific revenue numbers and growth rates.
+            Find current market size as of {current_year}, growth rate, and market projections through {projection_year}. Focus on:
+            - Global and regional market size data
+            - CAGR (Compound Annual Growth Rate)
+            - Market segmentation by type and application
+            - Key growth drivers and market dynamics
             
-            Format your response with specific numbers and data points."""
+            Prioritize data from industry reports, market research firms, and financial analyses."""
         await user_proxy.a_initiate_chat(research_agent, message=query)
         market_size = extract_findings(user_proxy.chat_messages[research_agent])
         if not market_size:
@@ -48,9 +52,14 @@ async def run_product_research(topic: str):
     else:
         query = f"""Search for information about key players in {topic}.
             
-            Find major companies and startups in this field as of {current_year}. Include market share, revenue, funding, and notable products or services.
+            Find major companies and startups in this field as of {current_year}. Include:
+            - Market share and competitive positioning
+            - Revenue data and financial performance
+            - Recent funding rounds and investments
+            - Product portfolio and technological capabilities
+            - Strategic partnerships and acquisitions
             
-            Format your response with specific company details."""
+            Focus on company reports, investor presentations, and industry analyses."""
         await user_proxy.a_initiate_chat(research_agent, message=query)
         key_players = extract_findings(user_proxy.chat_messages[research_agent])
         if not key_players:
@@ -65,9 +74,14 @@ async def run_product_research(topic: str):
     else:
         query = f"""Search for market trends in {topic}.
             
-            Find the latest market trends and developments in {current_year}. Include adoption rates, user statistics, and industry shifts.
+            Find the latest market trends and developments in {current_year}. Cover:
+            - Current adoption rates and deployment statistics
+            - Regional adoption patterns
+            - Regulatory landscape and policy changes
+            - Consumer/end-user preferences and feedback
+            - Implementation challenges and solutions
             
-            Format your response with specific trend analysis."""
+            Use healthcare industry reports, regulatory documents, and market surveys."""
         await user_proxy.a_initiate_chat(research_agent, message=query)
         market_trends = extract_findings(user_proxy.chat_messages[research_agent])
         if not market_trends:
@@ -82,9 +96,14 @@ async def run_product_research(topic: str):
     else:
         query = f"""Search for technical innovations in {topic}.
             
-            Find the latest technical innovations and breakthroughs as of {current_year}. Include specific technologies, performance metrics, and technical capabilities.
+            Find the latest technical innovations and breakthroughs as of {current_year}. Include:
+            - Recent technological advancements
+            - Performance benchmarks and comparisons
+            - Safety and reliability metrics
+            - Integration capabilities and standards
+            - Patent and IP landscape
             
-            Format your response with specific technical details."""
+            Reference technical papers, patent databases, and product documentation."""
         await user_proxy.a_initiate_chat(research_agent, message=query)
         tech_findings = extract_findings(user_proxy.chat_messages[research_agent])
         if not tech_findings:

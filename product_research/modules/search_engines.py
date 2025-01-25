@@ -22,15 +22,22 @@ def perplexity_search(query: str, num_results: int = 2) -> str:
         
         print(f"Debug: Sending query to Perplexity API: {query}")
         response = client.chat.completions.create(
-            model="sonar-pro",
+            model="sonar",  # Using the standard Perplexity model
             messages=[
                 {
                     "role": "system",
-                    "content": "You are a helpful research assistant. Provide detailed, factual information with specific numbers and data when available."
+                    "content": """You are a specialized market research assistant. Your responses should:
+                    1. Focus on reliable sources like industry reports, market analyses, and academic research
+                    2. Always include sources and citations for data points
+                    3. Prioritize recent data and statistics
+                    4. Indicate if data is estimated or projected
+                    5. Compare multiple sources when possible
+                    6. Include URLs or references to original sources
+                    Format your response with clear sections and bullet points."""
                 },
                 {
                     "role": "user",
-                    "content": query
+                    "content": f"{query}\n\nPlease include sources and citations for all data points and statistics."
                 }
             ]
         )
@@ -48,25 +55,38 @@ def perplexity_search(query: str, num_results: int = 2) -> str:
         traceback.print_exc()
         return f"Error in perplexity_search: {str(e)}"
 
-def arxiv_search(query: str, max_results: int = 2) -> str:
+def arxiv_search(query: str, max_results: int = 3) -> str:
     """
     Search Arxiv for papers and return the results including abstracts
     """
     client = arxiv.Client()
+    
+    # Add relevant categories to the search
+    categories = ["cs.RO", "cs.AI", "cs.HC"]  # Robotics, AI, Human-Computer Interaction
+    category_filter = " OR ".join(f"cat:{cat}" for cat in categories)
+    
+    # Enhance query with category filter
+    enhanced_query = f"({query}) AND ({category_filter})"
+    
     search = arxiv.Search(
-        query=query,
+        query=enhanced_query,
         max_results=max_results,
         sort_by=arxiv.SortCriterion.Relevance
     )
 
     formatted_results = []
     for paper in client.results(search):
+        # Calculate citation impact if available
+        citation_info = ""
+        
         paper_info = (
             f"Title: {paper.title}\n"
             f"Authors: {', '.join(author.name for author in paper.authors)}\n"
             f"Published: {paper.published.strftime('%Y-%m-%d')}\n"
+            f"Categories: {', '.join(paper.categories)}\n"
             f"Abstract: {paper.summary}\n"
             f"PDF URL: {paper.pdf_url}\n"
+            f"{citation_info}"
         )
         formatted_results.append(paper_info)
 
