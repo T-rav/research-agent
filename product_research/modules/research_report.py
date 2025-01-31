@@ -1,6 +1,7 @@
 import os
 import json
-from typing import Dict, Optional
+from typing import Dict
+from datetime import datetime
 
 class ResearchReport:
     def __init__(self, topic: str):
@@ -11,6 +12,9 @@ class ResearchReport:
         self.tech_findings = ""
         self.summary = ""
         self.detailed_report = ""
+        self.created_at = datetime.now().isoformat()
+        self.last_updated = self.created_at
+        self.version = "1.0.0"
         
         # Create safe filename
         safe_filename = "".join(x for x in topic if x.isalnum() or x in (' ', '-', '_')).rstrip()
@@ -33,7 +37,10 @@ class ResearchReport:
             "market_trends": self.market_trends,
             "tech_findings": self.tech_findings,
             "summary": self.summary,
-            "detailed_report": self.detailed_report
+            "detailed_report": self.detailed_report,
+            "created_at": self.created_at,
+            "last_updated": self.last_updated,
+            "version": self.version
         }
     
     def from_dict(self, data: Dict) -> None:
@@ -45,9 +52,13 @@ class ResearchReport:
         self.tech_findings = data.get("tech_findings", "")
         self.summary = data.get("summary", "")
         self.detailed_report = data.get("detailed_report", "")
+        self.created_at = data.get("created_at", datetime.now().isoformat())
+        self.last_updated = data.get("last_updated", self.created_at)
+        self.version = data.get("version", "1.0.0")
     
     def save(self) -> None:
         """Save report data to JSON file"""
+        self._update_metadata()
         with open(self.json_path, 'w') as f:
             json.dump(self.to_dict(), f, indent=2)
         self._write_markdown()
@@ -76,6 +87,11 @@ class ResearchReport:
         # Format the complete report
         report_content = f"""# Product Research Report: {self.topic}
 
+## Report Metadata
+- Generated: {self.created_at}
+- Last Updated: {self.last_updated}
+- Version: {self.version}
+
 ## Executive Summary
 
 {self.summary}
@@ -94,7 +110,14 @@ class ResearchReport:
         
         with open(self.report_path, 'w') as f:
             f.write(report_content)
-    
+
+    def _update_metadata(self) -> None:
+        """Update metadata when changes are made"""
+        self.last_updated = datetime.now().isoformat()
+        # Increment patch version
+        major, minor, patch = self.version.split('.')
+        self.version = f"{major}.{minor}.{int(patch) + 1}"
+
     def update_market_size(self, content: str) -> None:
         """Update market size section and save"""
         self.market_size = content

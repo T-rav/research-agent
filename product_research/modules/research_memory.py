@@ -63,6 +63,7 @@ class ResearchMemory:
     def extract_sources(self, text: str) -> List[Dict[str, str]]:
         """Extract URLs and citations from text."""
         sources = []
+        seen_urls = set()  # Track unique URLs
         
         # URL patterns
         url_pattern = r'<(https?://[^>\s]+)>'  # URLs in angle brackets
@@ -70,22 +71,33 @@ class ResearchMemory:
         
         # Extract URLs in angle brackets
         urls = re.findall(url_pattern, text)
-        sources.extend([{"type": "url", "url": url, "citation": None} for url in urls])
+        for url in urls:
+            normalized_url = self._normalize_url(url)
+            if normalized_url not in seen_urls:
+                seen_urls.add(normalized_url)
+                sources.append({"type": "url", "url": url, "citation": None})
         
         # Extract bare URLs
         bare_urls = re.findall(bare_url_pattern, text)
-        sources.extend([{"type": "url", "url": url, "citation": None} for url in bare_urls])
+        for url in bare_urls:
+            normalized_url = self._normalize_url(url)
+            if normalized_url not in seen_urls:
+                seen_urls.add(normalized_url)
+                sources.append({"type": "url", "url": url, "citation": None})
         
         # Extract formatted citations with URLs
         citation_pattern = r'\[(\d+)\]\s+([^<\n]+)<(https?://[^>\s]+)>'
         citations = re.findall(citation_pattern, text, re.MULTILINE)
         for ref_num, citation_text, url in citations:
-            sources.append({
-                "type": "citation",
-                "url": url,
-                "citation": citation_text.strip(),
-                "reference_number": ref_num
-            })
+            normalized_url = self._normalize_url(url)
+            if normalized_url not in seen_urls:
+                seen_urls.add(normalized_url)
+                sources.append({
+                    "type": "citation",
+                    "url": url,
+                    "citation": citation_text.strip(),
+                    "reference_number": ref_num
+                })
         
         # Academic citation patterns
         academic_patterns = [
@@ -98,37 +110,75 @@ class ResearchMemory:
         for pattern, source_type in academic_patterns:
             matches = re.findall(pattern, text, re.IGNORECASE)
             for match in matches:
-                sources.append({
-                    "type": source_type,
-                    "identifier": match,
-                    "citation": None
-                })
+                source_id = f"{source_type}:{match}"
+                if source_id not in seen_urls:  # Use same set for deduplication
+                    seen_urls.add(source_id)
+                    sources.append({
+                        "type": source_type,
+                        "id": match,
+                        "citation": self._format_academic_citation(source_type, match)
+                    })
         
-        # Remove duplicates while preserving citation information
-        unique_sources = {}
+        return sources
+
+    def _normalize_url(self, url: str) -> str:
+        """Normalize URL for deduplication by removing common variations"""
+        url = url.lower()
+        url = re.sub(r'https?://(www\.)?', '', url)  # Remove protocol and www
+        url = url.rstrip('/')  # Remove trailing slash
+        url = re.sub(r'\?.*$', '', url)  # Remove query parameters
+        return url
+
+    def _format_academic_citation(self, source_type: str, identifier: str) -> str:
+        """Format academic citations consistently"""
+        if source_type == 'doi':
+            return f"DOI: {identifier}"
+        elif source_type == 'arxiv':
+            return f"arXiv: {identifier}"
+        elif source_type == 'report':
+            return f"Market Report ({identifier})"
+        elif source_type == 'patent':
+            return f"Patent {identifier}"
+        return identifier
+
+    def add_sources(self, section: str, sources: List[Dict[str, str]]) -> None:
+        """Add sources to a section with deduplication"""
+        if section not in self.memory["sources"]:
+            return
+        
+        existing_sources = {
+            self._normalize_url(s.get("url", s.get("id", "")))
+            for s in self.memory["sources"][section]
+        }
+        
+        new_sources = []
         for source in sources:
-            key = source.get("url") or source.get("identifier")
-            if key and (key not in unique_sources or source.get("citation")):
-                unique_sources[key] = source
-                
-        return list(unique_sources.values())
+            source_id = self._normalize_url(source.get("url", source.get("id", "")))
+            if source_id not in existing_sources:
+                existing_sources.add(source_id)
+                new_sources.append(source)
+        
+        self.memory["sources"][section].extend(new_sources)
+        self._save_memory()
 
     def format_source_for_report(self, source: Dict[str, str]) -> str:
         """Format a source for the report."""
         if source["type"] == "citation":
-            return f"[{source['reference_number']}] {source['citation']} {source['url']}"
+            return f"[{source['reference_number']}] {source['citation']} <{source['url']}>"
         elif source["type"] == "url":
-            return source["url"]
-        elif source["type"] == "doi":
-            return f"DOI: {source['identifier']}"
-        elif source["type"] == "arxiv":
-            return f"arXiv: {source['identifier']}"
-        elif source["type"] == "report":
-            return f"Market Report ({source['identifier']})"
-        elif source["type"] == "patent":
-            return f"Patent {source['identifier']}"
-        return str(source)
-    
+            return f"<{source['url']}>"
+        else:  # Academic citations
+            return source["citation"]
+
+    def get_sources_by_type(self, source_type: Optional[str] = None) -> List[Dict[str, str]]:
+        """Get all sources of a specific type, or all sources if type is None"""
+        all_sources = []
+        for section_sources in self.memory["sources"].values():
+            for source in section_sources:
+                if source_type is None or source["type"] == source_type:
+                    all_sources.append(source)
+        return all_sources
+
     def add_market_size_data(self, data: str):
         """Add market size research data if not already present."""
         if not self.has_market_size_data():

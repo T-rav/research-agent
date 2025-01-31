@@ -4,7 +4,7 @@ from typing import Dict, List
 import autogen
 from modules.agents import create_agents
 from modules.research_memory import ResearchMemory
-from modules.report_generator import write_summary_to_file
+from modules.research_report import ResearchReport
 from datetime import datetime
 
 def extract_findings(content: str) -> str:
@@ -35,9 +35,9 @@ async def run_product_research(topic: str):
     """
     print(f"\nResearching topic: {topic}")
     
-    # Initialize memory and report generator
+    # Initialize memory and report
     memory = ResearchMemory(topic)
-    report_file = f"reports/{datetime.now().strftime('%Y%m%d_%H%M%S')}_{topic.replace(' ', '_')}.md"
+    report = ResearchReport(topic)
     
     try:
         # Create agents
@@ -77,10 +77,13 @@ async def run_product_research(topic: str):
                 print("Warning: No market size data found")
             else:
                 memory.add_market_size_data(market_size)
+                report.update_market_size(market_size)
                 print("✓ Market size research complete")
         else:
             print("\nSkipping market size research - data already exists")
             print(f"Last updated: {memory.get_last_updated('market_size')}")
+            # Update report with existing data
+            report.update_market_size(memory.memory.get("market_size", ""))
 
         # Key Players Research
         if not memory.has_competitor_data():
@@ -98,139 +101,111 @@ async def run_product_research(topic: str):
                 print("Warning: No key players data found")
             else:
                 memory.add_competitor_data(key_players)
+                report.update_key_players(key_players)
                 print("✓ Competitor research complete")
         else:
             print("\nSkipping competitor research - data already exists")
             print(f"Last updated: {memory.get_last_updated('competitors')}")
+            # Update report with existing data
+            report.update_key_players(memory.memory.get("competitors", ""))
 
         # Market Trends Research
         if not memory.has_trend_data():
-            print("\nResearching market trends and dynamics...")
-            query = f"""Identify key market trends and dynamics in {topic}:
-                - Current and emerging trends
-                - Customer needs and pain points
-                - Regulatory environment and compliance
-                - Implementation challenges and solutions
+            print("\nResearching market trends and developments...")
+            query = f"""Analyze current and emerging trends in {topic}:
+                - Key market trends and developments
+                - Emerging technologies and innovations
+                - Consumer behavior and preferences
+                - Regulatory landscape and compliance
                 
-                Use healthcare industry reports, regulatory documents, and market surveys."""
+                Focus on recent industry reports, news, and analyst insights."""
             results = await run_team_research(query, user_proxy, research_lead, manager)
-            market_trends = extract_findings(results)
-            if not market_trends:
-                print("Warning: No market trends data found")
+            trends = extract_findings(results)
+            if not trends:
+                print("Warning: No trend data found")
             else:
-                memory.add_trend_data(market_trends)
+                memory.add_trend_data(trends)
+                report.update_market_trends(trends)
                 print("✓ Market trends research complete")
         else:
-            print("\nSkipping market trends research - data already exists")
+            print("\nSkipping trends research - data already exists")
             print(f"Last updated: {memory.get_last_updated('trends')}")
+            # Update report with existing data
+            report.update_market_trends(memory.memory.get("trends", ""))
 
         # Technical Research
         if not memory.has_technical_data():
-            print("\nConducting technical research...")
+            print("\nResearching technical aspects and implementation...")
             query = f"""Analyze the technical aspects of {topic}:
-                - Key technologies and platforms
-                - Technical requirements and standards
-                - Implementation considerations
-                - Patent and IP landscape
+                - Core technologies and frameworks
+                - Implementation challenges
+                - Infrastructure requirements
+                - Technical skills and expertise needed
                 
-                Reference technical papers, patent databases, and product documentation."""
+                Focus on technical documentation, developer resources, and engineering blogs."""
             results = await run_team_research(query, user_proxy, research_lead, manager)
             tech_findings = extract_findings(results)
             if not tech_findings:
-                print("Warning: No technical research data found")
+                print("Warning: No technical findings")
             else:
                 memory.add_technical_data(tech_findings)
+                report.update_tech_findings(tech_findings)
                 print("✓ Technical research complete")
         else:
             print("\nSkipping technical research - data already exists")
             print(f"Last updated: {memory.get_last_updated('technical')}")
+            # Update report with existing data
+            report.update_tech_findings(memory.memory.get("technical", ""))
 
-        # Generate Summary
+        # Generate Executive Summary
         if not memory.has_summary():
-            print("\nGenerating comprehensive summary...")
-            query = f"""Based on all research findings for {topic}, generate a comprehensive summary:
-
-                MARKET OVERVIEW
-                [Summarize market size, growth potential, and key dynamics]
+            print("\nGenerating executive summary...")
+            query = f"""Based on all research findings, provide:
+                1. A concise executive summary
+                2. Top 3 product opportunities with clear rationale
                 
-                COMPETITIVE LANDSCAPE
-                [Detail key players, market shares, and competitive advantages]
-                
-                MARKET TRENDS
-                [List major trends, challenges, and opportunities]
-                
-                TECHNICAL ANALYSIS
-                [Summarize key technical findings and considerations]
-                
-                RECOMMENDATIONS
-                [Provide strategic recommendations]
-                
-                Format the response as:
-                SUMMARY_START
-                [Your comprehensive summary here, organized in sections]
-                - [Include specific data points and metrics]
-                - [Include specific technical or market-focused actions]
-                SUMMARY_COMPLETE
-                """
+                Use all the collected research data to support your conclusions."""
             results = await run_team_research(query, user_proxy, research_lead, manager)
-
-            # Extract and verify summary
-            summary_content = extract_summary(results)
-            if not summary_content:
-                print("Error: Failed to generate summary")
-                return
-
-            # Get findings from memory
-            market_findings = memory.get_market_findings()
-            technical_findings = memory.get_technical_findings()
-            sources = memory.get_all_sources()
-
-            # Write report and save to memory
-            write_summary_to_file(
-                topic=topic,
-                market_findings=market_findings,
-                technical_findings=technical_findings,
-                summary_content=summary_content,
-                report_file=report_file,
-                sources=sources
-            )
-            memory.add_summary(summary_content)
-            print("✓ Summary generation complete")
+            summary = extract_summary(results)
+            detailed_report = extract_findings(results)
+            if not summary or not detailed_report:
+                print("Warning: Could not generate summary")
+            else:
+                memory.add_summary(summary)
+                report.update_summary(summary, detailed_report)
+                print("✓ Executive summary complete")
         else:
-            print("\nSkipping summary generation - summary already exists")
+            print("\nSkipping summary - already exists")
             print(f"Last updated: {memory.get_last_updated('summary')}")
+            # Update report with existing data
+            report.update_summary(memory.memory.get("summary", ""), "")
+
+        print(f"\nResearch complete! Report saved to: {report.report_path}")
+        return report.report_path
 
     except Exception as e:
         print(f"Error during research: {str(e)}")
-        return
+        raise
 
-    print(f"\nReport has been written to: {report_file}")
-    print("\nResearch complete!")
-
-async def run_team_research(query: str, user_proxy, research_lead, manager) -> str:
+async def run_team_research(query: str, user_proxy, research_lead, manager):
     """Run a research query through the multi-agent team."""
-    await user_proxy.a_initiate_chat(
-        research_lead,
-        message=f"""Please coordinate the research team to investigate: {query}
-        
-        Required steps:
-        1. Break down research objectives
-        2. Delegate specific tasks to team members
-        3. Review and validate findings
-        4. Synthesize final report
-        
-        END RESEARCH with 'TERMINATE' when complete.""",
-        manager=manager
-    )
-    return research_lead.last_message()["content"]
+    try:
+        await user_proxy.initiate_chat(
+            research_lead,
+            message=query
+        )
+        return user_proxy.last_message()
+    except Exception as e:
+        print(f"Error in team research: {str(e)}")
+        return ""
 
 if __name__ == "__main__":
     import asyncio
     import sys
     
-    if len(sys.argv) < 2:
-        print("Please provide a research topic")
+    if len(sys.argv) != 2:
+        print("Usage: python app.py 'research topic'")
         sys.exit(1)
-        
-    topic = " ".join(sys.argv[1:])
+    
+    topic = sys.argv[1]
     asyncio.run(run_product_research(topic))

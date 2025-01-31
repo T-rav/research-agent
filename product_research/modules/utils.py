@@ -1,128 +1,42 @@
 import os
-from typing import Dict, List
+import json
+from typing import Dict, List, Optional
 
-def extract_findings(messages):
+def extract_findings(messages) -> str:
     """Extract findings from agent messages"""
-    if not messages:
-        return ""
+    if isinstance(messages, str):
+        return messages.strip()
     
-    # Get messages in reverse order
-    messages = list(reversed(messages))
+    if isinstance(messages, dict):
+        content = messages.get("content", "")
+        return content.strip()
     
-    # Debug print
-    print("\nDEBUG Messages:")
-    for msg in messages:
-        content = msg.get("content", "")
-        if content:
-            content_preview = content[:100] + "..."
-        else:
-            content_preview = "<no content>"
-        print(f"Role: {msg.get('role')}, Content: {content_preview}")
-        
-        # Check for function call results
-        function_call = msg.get("function_call")
-        if function_call:
-            print(f"Function call: {function_call.get('name')}")
-            print(f"Function result: {msg.get('function_call_result', '<no result>')[:100]}...")
+    if isinstance(messages, list):
+        # Get the last non-empty message
+        for message in reversed(messages):
+            if isinstance(message, dict):
+                content = message.get("content", "").strip()
+                if content:
+                    return content
     
-    # Get the last function call result first
-    for msg in messages:
-        result = msg.get("function_call_result")
-        if result and isinstance(result, str):
-            return result.strip()
-    
-    # Fall back to last assistant message if no function results
-    for msg in messages:
-        if msg.get("role") == "assistant":
-            content = msg.get("content", "")
-            if isinstance(content, str):
-                return content.strip()
     return ""
 
-def extract_summary(messages):
+def extract_summary(messages) -> str:
     """Extract summary from agent messages"""
-    if not messages:
+    content = extract_findings(messages)
+    
+    if not content:
         return ""
     
-    # Get messages in reverse order
-    messages = list(reversed(messages))
+    # Extract content between SUMMARY_START and SUMMARY_COMPLETE
+    start_marker = "SUMMARY_START"
+    end_marker = "SUMMARY_COMPLETE"
     
-    # Debug print
-    print("\nDEBUG Messages:")
-    for msg in messages:
-        content = msg.get("content", "")
-        if content:
-            content_preview = content[:100] + "..."
-        else:
-            content_preview = "<no content>"
-        print(f"Role: {msg.get('role')}, Content: {content_preview}")
-        
-        # Check for function call results
-        function_call = msg.get("function_call")
-        if function_call:
-            print(f"Function call: {function_call.get('name')}")
-            print(f"Function result: {msg.get('function_call_result', '<no result>')[:100]}...")
+    start_idx = content.find(start_marker)
+    end_idx = content.find(end_marker)
     
-    # For summary, we still want the assistant message with tags
-    for msg in messages:
-        if msg.get("role") == "assistant":
-            content = msg.get("content", "")
-            if isinstance(content, str):
-                if "<SUMMARY>" in content:
-                    start = content.find("<SUMMARY>") + len("<SUMMARY>")
-                    end = content.find("SUMMARY_COMPLETE")
-                    if end != -1:
-                        return content[start:end].strip()
-                return content.strip()
-    return ""
-
-def write_summary_to_file(topic: str, market_findings: str, technical_findings: str, summary_content: str, report_file: str, sources: Dict[str, List[Dict[str, str]]] = None) -> None:
-    """Write research summary to a markdown file."""
-    try:
-        # Create reports directory if it doesn't exist
-        os.makedirs(os.path.dirname(report_file), exist_ok=True)
-        
-        # Format the report
-        report_content = f"""# Research Report: {topic}
-
-## Market Analysis
-{market_findings}
-
-## Technical Analysis
-{technical_findings}
-
-## Executive Summary
-{summary_content}
-"""
-
-        # Add sources if available
-        if sources:
-            report_content += "\n## Sources\n"
-            for section, section_sources in sources.items():
-                if section_sources:
-                    report_content += f"\n### {section.replace('_', ' ').title()}\n"
-                    # Sort sources by reference number if available
-                    sorted_sources = sorted(section_sources, 
-                                         key=lambda x: (x.get('reference_number', '999'), 
-                                                      x.get('url', x.get('identifier', ''))))
-                    for source in sorted_sources:
-                        if source.get('citation'):
-                            report_content += f"- [{source['reference_number']}] {source['citation']}\n  {source['url']}\n"
-                        elif source.get('url'):
-                            report_content += f"- {source['url']}\n"
-                        elif source.get('identifier'):
-                            if source['type'] == 'doi':
-                                report_content += f"- DOI: {source['identifier']}\n"
-                            elif source['type'] == 'arxiv':
-                                report_content += f"- arXiv: {source['identifier']}\n"
-                            elif source['type'] == 'report':
-                                report_content += f"- Market Report ({source['identifier']})\n"
-                            elif source['type'] == 'patent':
-                                report_content += f"- Patent {source['identifier']}\n"
-        
-        # Write to file
-        with open(report_file, 'w') as f:
-            f.write(report_content)
-            
-    except Exception as e:
-        print(f"Error writing summary to file: {str(e)}")
+    if start_idx == -1 or end_idx == -1:
+        return content
+    
+    summary = content[start_idx + len(start_marker):end_idx].strip()
+    return summary
