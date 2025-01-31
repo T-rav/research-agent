@@ -2,10 +2,10 @@
 import autogen
 from typing import Dict, List, Tuple, Optional
 from datetime import datetime
-from .qa_agent import QAAgent
-from .proxy_agent import create_user_proxy
-from .research_agent import ResearchAgent
-from .research_report import ResearchReport
+from qa_agent import QAAgent
+from proxy_agent import create_user_proxy
+from research_agent import ResearchAgent
+from research_report import ResearchReport
 
 class ResearchDirector:
     """Manages and orchestrates the research process"""

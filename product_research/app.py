@@ -2,7 +2,7 @@
 import asyncio
 from typing import Dict, Any, Tuple, List
 
-from .research_director import ResearchDirector
+from research_director import ResearchDirector
 
 async def run_product_research(topic: str) -> Tuple[str, List[str]]:
     """Run product research on a given topic

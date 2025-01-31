@@ -1,7 +1,7 @@
 """Research Agent for conducting product research"""
 import autogen
 from typing import Dict, List, Tuple
-from .search_engines import perplexity_search, arxiv_search
+from search_engines import perplexity_search, arxiv_search
 
 class ResearchAgent:
     """Conducts product research tasks"""
