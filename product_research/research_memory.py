@@ -16,6 +16,10 @@ class ResearchMemory:
         
         # Initialize or load memory
         self.memory = self._load_memory()
+        
+        # Save initial state if file didn't exist
+        if not self.memory_file.exists():
+            self.save()
     
     def _load_memory(self) -> Dict:
         """Load memory from file if it exists, otherwise initialize empty."""

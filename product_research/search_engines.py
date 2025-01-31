@@ -31,7 +31,7 @@ def perplexity_search(query: str, num_results: int = 2) -> str:
                     "content": """You are a specialized market research assistant. Your responses should:
                     1. Focus on reliable sources like industry reports, market analyses, and academic research
                     2. Always include sources and citations for data points
-                    3. Prioritize recent data and statistics
+                    3. Include both current data and historical trends when available
                     4. Indicate if data is estimated or projected
                     5. Compare multiple sources when possible
                     6. Include URLs or references to original sources
@@ -39,7 +39,7 @@ def perplexity_search(query: str, num_results: int = 2) -> str:
                 },
                 {
                     "role": "user",
-                    "content": f"{query}\n\nPlease include sources and citations for all data points and statistics."
+                    "content": f"{query}\n\nPlease include sources and citations for all data points and statistics, covering both current and historical data where available."
                 }
             ]
         )

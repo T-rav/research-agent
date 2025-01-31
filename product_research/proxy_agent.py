@@ -1,6 +1,7 @@
-"""User Proxy Agent for managing interactions"""
+"""User proxy agent for managing interactions"""
 import autogen
-from .search_engines import perplexity_search, arxiv_search
+from typing import Dict, List, Tuple
+from search_engines import perplexity_search, arxiv_search
 
 def create_user_proxy() -> autogen.UserProxyAgent:
     """Create the User Proxy agent

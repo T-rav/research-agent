@@ -2,7 +2,7 @@ import os
 import json
 from typing import Dict, List, Tuple
 from datetime import datetime
-from .research_memory import ResearchMemory
+from research_memory import ResearchMemory
 
 class ResearchReport:
     """Stores and formats research findings"""
@@ -28,8 +28,14 @@ class ResearchReport:
         self.json_path = f"reports/research_data_{safe_filename}.json"
         self.report_path = f"reports/product_research_report_{safe_filename}.md"
         
-        # Load existing data if available
-        self.load()
+        # Load existing data if available, otherwise create empty files
+        if os.path.exists(self.json_path):
+            self.load()
+        else:
+            # Save initial empty state
+            self.save()
+            # Create empty markdown report
+            self._write_markdown()
     
     def to_dict(self) -> Dict:
         """Convert report metadata to dictionary for JSON serialization"""
@@ -145,7 +151,17 @@ class ResearchReport:
         Args:
             section: Section name to check
         """
-        return bool(self._memory.get(section))
+        if section == "market_size":
+            return self._memory.has_market_size_data()
+        elif section == "competitors":
+            return self._memory.has_competitor_data()
+        elif section == "trends":
+            return self._memory.has_trend_data()
+        elif section == "technical":
+            return self._memory.has_technical_data()
+        elif section == "summary":
+            return self._memory.has_summary()
+        return False
     
     def get_section_updated(self, section: str) -> str:
         """Get when a section was last updated
@@ -153,60 +169,57 @@ class ResearchReport:
         Args:
             section: Section name to check
         """
-        return self._memory.get_metadata(section).get("updated_at")
+        return self._memory.get_last_updated(section)
     
     def get_market_size(self) -> str:
         """Get market size analysis"""
-        return self._memory.get("market_size")
+        return self._memory.get_market_size()
     
     def set_market_size(self, content: str):
         """Update market size analysis"""
-        self._memory.set("market_size", content)
+        self._memory.add_market_size_data(content)
         self.save()
     
     def get_competitors(self) -> str:
         """Get competitor analysis"""
-        return self._memory.get("competitors")
+        return self._memory.get_competitors()
     
     def set_competitors(self, content: str):
         """Update competitor analysis"""
-        self._memory.set("competitors", content)
+        self._memory.add_competitor_data(content)
         self.save()
     
     def get_trends(self) -> str:
         """Get market trends analysis"""
-        return self._memory.get("trends")
+        return self._memory.get_trends()
     
     def set_trends(self, content: str):
         """Update market trends analysis"""
-        self._memory.set("trends", content)
+        self._memory.add_trend_data(content)
         self.save()
     
     def get_technical_findings(self) -> str:
         """Get technical analysis"""
-        return self._memory.get("technical")
+        return self._memory.get_technical()
     
     def set_technical_findings(self, content: str):
         """Update technical analysis"""
-        self._memory.set("technical", content)
+        self._memory.add_technical_data(content)
         self.save()
     
     def get_summary(self) -> str:
         """Get executive summary"""
-        return self._memory.get("summary")
+        return self._memory.get_summary()
     
     def set_summary(self, content: str):
         """Update executive summary"""
-        self._memory.set("summary", content)
+        self._memory.add_summary(content)
         self.save()
     
     def get_sources(self) -> Dict[str, List[str]]:
-        """Get all sources used in the report"""
-        return {
-            section: self._memory.get_metadata(section).get("sources", [])
-            for section in ["market_size", "competitors", "trends", "technical", "summary"]
-        }
+        """Get all sources"""
+        return self._memory.get_all_sources()
     
     def _format_source(self, source: str) -> str:
         """Format a source for the report"""
-        return source
+        return self._memory.format_source_for_report(source)
