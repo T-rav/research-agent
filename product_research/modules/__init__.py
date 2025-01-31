@@ -1,15 +1,15 @@
-from .agents import create_agents
-from .search_engines import perplexity_search, arxiv_search
-from .utils import extract_findings, extract_summary
+"""Product Research package initialization"""
+from .research_agent import ResearchAgent
 from .research_report import ResearchReport
-from .research_memory import ResearchMemory
+from .qa_agent import QAAgent
+from .search_engines import perplexity_search, arxiv_search
+from .boss import Boss
 
 __all__ = [
-    'create_agents',
-    'perplexity_search',
-    'arxiv_search',
-    'extract_findings',
-    'extract_summary',
+    'ResearchAgent',
     'ResearchReport',
-    'ResearchMemory'
+    'QAAgent',
+    'Boss',
+    'perplexity_search',
+    'arxiv_search'
 ]

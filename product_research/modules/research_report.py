@@ -3,13 +3,18 @@ import json
 from typing import Dict, List, Tuple
 from datetime import datetime
 from .research_memory import ResearchMemory
-from .qa_agent import QAAgent
 
 class ResearchReport:
+    """Stores and formats research findings"""
+    
     def __init__(self, topic: str):
+        """Initialize research report
+        
+        Args:
+            topic: Research topic
+        """
         self.topic = topic
-        self._memory = ResearchMemory(topic)  # Internal implementation detail
-        self._qa_agent = QAAgent()  # QA agent for content validation
+        self._memory = ResearchMemory(topic)
         self.created_at = datetime.now().isoformat()
         self.last_updated = self.created_at
         self.version = "1.0.0"
@@ -25,32 +30,6 @@ class ResearchReport:
         
         # Load existing data if available
         self.load()
-    
-    async def _validate_content(self, section: str, content: str) -> Tuple[str, List[str]]:
-        """
-        Validate content with QA agent
-        Returns: (validated_content, warnings)
-        """
-        is_valid, corrections, improvements = await self._qa_agent.validate_content(section, content)
-        warnings = []
-        
-        if not is_valid:
-            warnings.extend([f"Warning: {correction}" for correction in corrections])
-            # Log improvements as suggestions
-            warnings.extend([f"Suggestion: {improvement}" for improvement in improvements])
-            
-            print("\nContent validation results:")
-            print("\nCorrections needed:")
-            for correction in corrections:
-                print(f"- {correction}")
-            print("\nStyle improvements suggested:")
-            for improvement in improvements:
-                print(f"- {improvement}")
-            
-            # For now, we'll still save the content but with warnings
-            # In the future, we might want to make this configurable
-        
-        return content, warnings
     
     def to_dict(self) -> Dict:
         """Convert report metadata to dictionary for JSON serialization"""
@@ -161,70 +140,73 @@ class ResearchReport:
         ])
     
     def has_section(self, section: str) -> bool:
-        """Check if a section has content"""
-        content = {
-            'market_size': self.get_market_size,
-            'competitors': self.get_competitors,
-            'trends': self.get_trends,
-            'technical': self.get_technical_findings,
-            'summary': self.get_summary
-        }.get(section, lambda: None)()
-        return bool(content)
+        """Check if a section has content
+        
+        Args:
+            section: Section name to check
+        """
+        return bool(self._memory.get(section))
     
     def get_section_updated(self, section: str) -> str:
-        """Get when a section was last updated"""
-        return self._memory.get_last_updated(section)
+        """Get when a section was last updated
+        
+        Args:
+            section: Section name to check
+        """
+        return self._memory.get_metadata(section).get("updated_at")
     
-    # Core report sections
     def get_market_size(self) -> str:
         """Get market size analysis"""
-        return self._memory.get_market_size()
+        return self._memory.get("market_size")
     
-    def set_market_size(self, content: str) -> None:
+    def set_market_size(self, content: str):
         """Update market size analysis"""
-        self._memory.add_market_size_data(content)
+        self._memory.set("market_size", content)
         self.save()
     
     def get_competitors(self) -> str:
         """Get competitor analysis"""
-        return self._memory.get_competitors()
+        return self._memory.get("competitors")
     
-    def set_competitors(self, content: str) -> None:
+    def set_competitors(self, content: str):
         """Update competitor analysis"""
-        self._memory.add_competitor_data(content)
+        self._memory.set("competitors", content)
         self.save()
     
     def get_trends(self) -> str:
         """Get market trends analysis"""
-        return self._memory.get_trends()
+        return self._memory.get("trends")
     
-    def set_trends(self, content: str) -> None:
+    def set_trends(self, content: str):
         """Update market trends analysis"""
-        self._memory.add_trend_data(content)
+        self._memory.set("trends", content)
         self.save()
     
     def get_technical_findings(self) -> str:
         """Get technical analysis"""
-        return self._memory.get_technical()
+        return self._memory.get("technical")
     
-    def set_technical_findings(self, content: str) -> None:
+    def set_technical_findings(self, content: str):
         """Update technical analysis"""
-        self._memory.add_technical_data(content)
+        self._memory.set("technical", content)
         self.save()
     
     def get_summary(self) -> str:
         """Get executive summary"""
-        return self._memory.get_summary()
+        return self._memory.get("summary")
     
-    def set_summary(self, content: str) -> None:
+    def set_summary(self, content: str):
         """Update executive summary"""
-        self._memory.add_summary(content)
+        self._memory.set("summary", content)
         self.save()
     
     def get_sources(self) -> Dict[str, List[str]]:
         """Get all sources used in the report"""
-        return self._memory.get_all_sources()
+        return {
+            section: self._memory.get_metadata(section).get("sources", [])
+            for section in ["market_size", "competitors", "trends", "technical", "summary"]
+        }
     
     def _format_source(self, source: str) -> str:
         """Format a source for the report"""
-        return self._memory.format_source_for_report(source)
+        return source
