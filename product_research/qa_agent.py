@@ -34,22 +34,8 @@ class QAAgent:
         """
         config = self._get_base_config()
         
-        # Add function configuration
-        config["functions"] = [{
-            "name": "search_serper",
-            "description": "Search the web for fact checking",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "query": {"type": "string"}
-                },
-                "required": ["query"]
-            }
-        }]
-        
-        agent = autogen.AssistantAgent(
+        return autogen.AssistantAgent(
             name="QA_Reviewer",
-            llm_config=config,
             system_message="""You are the QA Reviewer, responsible for validating research content.
             
             Your role is to:
@@ -69,15 +55,25 @@ class QAAgent:
             INVALID: <reason> - If the content needs improvement
             
             Be thorough but efficient in your validation.
-            """
+            """,
+            llm_config={
+                **config,
+                "functions": [{
+                    "name": "search_serper",
+                    "description": "Search the web for fact checking",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "query": {"type": "string"}
+                        },
+                        "required": ["query"]
+                    }
+                }]
+            },
+            function_map={
+                "search_serper": search_serper
+            }
         )
-        
-        # Register function map
-        agent.function_map = {
-            "search_serper": search_serper
-        }
-        
-        return agent
         
     def get_agent(self) -> autogen.AssistantAgent:
         """Get the QA agent instance
@@ -87,7 +83,7 @@ class QAAgent:
         """
         return self.agent
 
-    async def validate_content(self, content: str, section: str, topic: str, proxy) -> Tuple[bool, str]:
+    def validate_content(self, content: str, section: str, topic: str, proxy) -> Tuple[bool, str]:
         """Validate research content
         
         Args:
@@ -100,7 +96,7 @@ class QAAgent:
             Tuple of (is_valid: bool, feedback: str)
         """
         print("\nSending content to QA reviewer...")
-        qa_response = await proxy.initiate_chat(
+        qa_response = proxy.initiate_chat(
             self.agent,
             message=f"""Please validate this research content for {section} of {topic}. 
             Check for:

@@ -1,7 +1,7 @@
 """User proxy agent for managing interactions"""
 import autogen
 from typing import Dict, List, Tuple
-from search_engines import perplexity_search, arxiv_search
+from search_engines import perplexity_search, arxiv_search, search_serper
 
 def create_user_proxy() -> autogen.UserProxyAgent:
     """Create the User Proxy agent
@@ -20,10 +20,21 @@ def create_user_proxy() -> autogen.UserProxyAgent:
         "config_list": config_list,
         "temperature": 0.1,
         "model": "gpt-4o-mini",
-        "timeout": 120
+        "timeout": 120,
+        "functions": [{
+            "name": "search_serper",
+            "description": "Search the web for fact checking",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string"}
+                },
+                "required": ["query"]
+            }
+        }]
     }
     
-    return autogen.UserProxyAgent(
+    proxy = autogen.UserProxyAgent(
         name="User_Proxy",
         human_input_mode="NEVER",
         max_consecutive_auto_reply=10,
@@ -32,6 +43,9 @@ def create_user_proxy() -> autogen.UserProxyAgent:
         llm_config=base_config,
         function_map={
             "perplexity_search": perplexity_search,
-            "arxiv_search": arxiv_search
+            "arxiv_search": arxiv_search,
+            "search_serper": search_serper
         }
     )
+    
+    return proxy

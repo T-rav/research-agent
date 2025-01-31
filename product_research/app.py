@@ -1,37 +1,43 @@
 """Main application module for product research"""
+import sys
+import os
 import asyncio
-from typing import Dict, Any, Tuple, List
-
+from typing import Tuple, List
 from research_director import ResearchDirector
 
-async def run_product_research(topic: str) -> Tuple[str, List[str]]:
-    """Run product research on a given topic
+async def run_product_research(topic: str):
+    """Run product research
     
     Args:
         topic: The product/technology to research
-        
-    Returns:
-        Tuple of (report_path, List[warnings])
     """
     try:
-        # Initialize director to coordinate research
+        # Create research director
         director = ResearchDirector()
         
-        # Run full research process
+        # Run research
         report_path, warnings = await director.research_full_topic(topic)
         
-        print(f"\nResearch complete! Report saved to: {report_path}")
-        return report_path, warnings
-        
+        # Print results
+        if warnings:
+            print("\nWarnings:")
+            for warning in warnings:
+                print(f"- {warning}")
+                
+        if report_path:
+            print(f"\nResearch completed! Report saved to: {report_path}")
+        else:
+            print("\nNo report generated due to errors")
+            
     except Exception as e:
         print(f"Error during research: {str(e)}")
-        raise
+        import traceback
+        print(traceback.format_exc())
+        sys.exit(1)
 
 if __name__ == "__main__":
-    import sys
-    
-    if len(sys.argv) != 2:
-        print("Usage: python app.py <topic>")
+    if len(sys.argv) < 2:
+        print("Please provide a topic to research")
         sys.exit(1)
         
     topic = sys.argv[1]

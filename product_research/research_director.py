@@ -13,50 +13,37 @@ from qa_agent import QAAgent
 from search_engines import perplexity_search
 
 class ResearchDirector:
-    """Manages and orchestrates the research process"""
+    """Director for coordinating product research"""
     
-    def __init__(self, max_rounds: int = 12, human_input_mode: str = "NEVER"):
-        """Initialize the research director
-        
-        Args:
-            max_rounds: Maximum number of conversation rounds
-            human_input_mode: When to request human input
-        """
-        # Create research team
-        self.research = ResearchAgent()
-        research_agents = self.research.get_agents()
-        
-        # Create QA reviewer
-        self.qa = QAAgent()
-        
+    def __init__(self):
+        """Initialize research director"""
         # Create user proxy
         self.proxy = create_user_proxy()
         
-        # Create group chat for research team
-        self.research_chat = autogen.GroupChat(
-            agents=list(research_agents.values()),
+        # Create research team
+        self.lead = self._create_research_lead()
+        self.analyst = self._create_data_analyst()
+        self.researcher = self._create_tech_researcher()
+        self.qa = QAAgent().get_agent()
+        
+        # Create group chat
+        self.group_chat = autogen.GroupChat(
+            agents=[self.lead, self.analyst, self.researcher, self.qa],
             messages=[],
-            max_round=max_rounds,
-            speaker_selection_method="round_robin"
+            max_round=12
         )
         
-        # Create group chat manager
+        # Create manager
         self.manager = autogen.GroupChatManager(
-            groupchat=self.research_chat,
-            llm_config={
-                "config_list": autogen.config_list_from_json(
-                    "OAI_CONFIG_LIST",
-                    filter_dict={"model": ["gpt-4o-mini"]}
-                ),
-                "temperature": 0.1
-            }
+            groupchat=self.group_chat,
+            llm_config=self.lead.llm_config
         )
         
         # Track reports by topic
         self.reports: Dict[str, ResearchReport] = {}
-    
+        
     async def research_topic(self, topic: str, section: str, attempt: int = 1, max_attempts: int = 3, qa_feedback: str = None) -> str:
-        """Research a topic
+        """Research a topic asynchronously
         
         Args:
             topic: The product/technology to research
@@ -82,36 +69,52 @@ class ResearchDirector:
             print(f"\nCreating new report for {topic}")
             report = ResearchReport(topic)
             self.reports[topic] = report
-        
-        # Create research task message
-        task = self._get_research_prompt(section, topic)
-        if qa_feedback:
-            task += f"""\n\nPrevious attempt was rejected by QA for the following reasons:
-            {qa_feedback}
             
-            Please address these issues in your research."""
+        # Create research task message
+        task = f"""Research task for {topic} - {section}
+        
+        Research Lead (@Research_Lead), please coordinate with:
+        1. Data Analyst (@Data_Analyst) for market data and trends
+        2. Technical Researcher (@Tech_Researcher) for technical details
+        3. QA Reviewer (@QA_Reviewer) to validate the final content
+        
+        {self._get_research_prompt(section, topic)}
+        
+        If QA approves the content with "VALID", save it and finish.
+        If QA responds with "INVALID", address the feedback and try again.
+        
+        Previous QA feedback to address:
+        {qa_feedback if qa_feedback else 'None'}
+        """
         
         print("\nStarting research team discussion...")
         print("-" * 40)
         
-        # Start research chat
-        chat_response = await self.proxy.initiate_chat(
+        # Start group chat
+        chat_response = await asyncio.to_thread(
+            self.proxy.initiate_chat,
             self.manager,
-            message=task
+            message=task,
+            silent=False
         )
         
-        # Extract research content from chat
+        # Extract final content from chat
         content = self._extract_research_content(chat_response)
-        print(f"\nResearch team completed their discussion")
-        print(f"Content length: {len(content)} characters")
-        print("-" * 40)
-        print("Content preview:")
-        print(content[:500] + "..." if len(content) > 500 else content)
-        print("-" * 40)
         
-        # Have QA validate in a separate chat
-        print("\nStarting QA validation...")
-        is_valid, feedback = await self.qa.validate_content(content, section, topic, self.proxy)
+        # Check if QA approved in the chat
+        messages = chat_response.chat_history if hasattr(chat_response, 'chat_history') else chat_response.messages
+        is_valid = False
+        feedback = ""
+        
+        for msg in reversed(messages):
+            if msg.get("name") == "QA_Reviewer":
+                response = msg.get("content", "")
+                if response.startswith("VALID"):
+                    is_valid = True
+                    break
+                elif "INVALID:" in response:
+                    feedback = response.split("INVALID:", 1)[1].strip()
+                    break
         
         if is_valid:
             print("\n✓ Content validated by QA")
@@ -122,6 +125,28 @@ class ResearchDirector:
             
         print(f"\n✗ Content needs revision - attempt {attempt}/{max_attempts}")
         return await self.research_topic(topic, section, attempt + 1, max_attempts, feedback)
+        
+    async def research_full_topic(self, topic: str) -> Tuple[str, List[str]]:
+        """Research all sections for a topic asynchronously
+        
+        Args:
+            topic: The product/technology to research
+            
+        Returns:
+            Tuple of (report_path, List[warnings])
+        """
+        warnings = []
+        report_path = None
+        
+        # Just do market size section for testing
+        section = ReportSection.MARKET_SIZE.value
+        result = await self.research_topic(topic, section)
+        if isinstance(result, str) and result.startswith("Error"):
+            warnings.append(f"Error researching {section}: {result}")
+        else:
+            report_path = result
+            
+        return report_path or "", warnings
     
     def _get_research_prompt(self, section: str, topic: str) -> str:
         """Get the research prompt for a section"""
@@ -223,25 +248,42 @@ class ResearchDirector:
             content = content.split("TERMINATE")[0].strip()
             
         return content
-    
-    async def research_full_topic(self, topic: str) -> Tuple[str, List[str]]:
-        """Research all sections for a topic
-        
-        Args:
-            topic: The product/technology to research
-            
-        Returns:
-            Tuple of (report_path, List[warnings])
-        """
-        warnings = []
-        report_path = None
-        
-        # Just do market size section for testing
-        section = ReportSection.MARKET_SIZE.value
-        result = await self.research_topic(topic, section)
-        if isinstance(result, str) and result.startswith("Error"):
-            warnings.append(f"Error researching {section}: {result}")
-        else:
-            report_path = result
-            
-        return report_path or "", warnings
+
+    def _create_research_lead(self):
+        # Create research lead agent
+        lead = ResearchAgent().get_agent()
+        lead.name = "Research_Lead"
+        lead.llm_config = {
+            "config_list": autogen.config_list_from_json(
+                "OAI_CONFIG_LIST",
+                filter_dict={"model": ["gpt-4o-mini"]}
+            ),
+            "temperature": 0.1
+        }
+        return lead
+
+    def _create_data_analyst(self):
+        # Create data analyst agent
+        analyst = ResearchAgent().get_agent()
+        analyst.name = "Data_Analyst"
+        analyst.llm_config = {
+            "config_list": autogen.config_list_from_json(
+                "OAI_CONFIG_LIST",
+                filter_dict={"model": ["gpt-4o-mini"]}
+            ),
+            "temperature": 0.1
+        }
+        return analyst
+
+    def _create_tech_researcher(self):
+        # Create technical researcher agent
+        researcher = ResearchAgent().get_agent()
+        researcher.name = "Tech_Researcher"
+        researcher.llm_config = {
+            "config_list": autogen.config_list_from_json(
+                "OAI_CONFIG_LIST",
+                filter_dict={"model": ["gpt-4o-mini"]}
+            ),
+            "temperature": 0.1
+        }
+        return researcher
