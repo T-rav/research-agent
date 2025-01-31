@@ -3,7 +3,6 @@ import json
 from typing import Dict, List
 import autogen
 from modules.agents import create_agents
-from modules.research_memory import ResearchMemory
 from modules.research_report import ResearchReport
 from datetime import datetime
 
@@ -35,8 +34,7 @@ async def run_product_research(topic: str):
     """
     print(f"\nResearching topic: {topic}")
     
-    # Initialize memory and report
-    memory = ResearchMemory(topic)
+    # Initialize report
     report = ResearchReport(topic)
     
     try:
@@ -62,7 +60,7 @@ async def run_product_research(topic: str):
         manager = autogen.GroupChatManager(groupchat=groupchat)
         
         # Market Size Research
-        if not memory.has_market_size_data():
+        if not report.has_market_size_data():
             print("\nResearching market size and opportunity...")
             query = f"""Research the market size and growth potential for {topic}:
                 - Total addressable market (TAM)
@@ -76,17 +74,14 @@ async def run_product_research(topic: str):
             if not market_size:
                 print("Warning: No market size data found")
             else:
-                memory.add_market_size_data(market_size)
                 report.update_market_size(market_size)
                 print("✓ Market size research complete")
         else:
             print("\nSkipping market size research - data already exists")
-            print(f"Last updated: {memory.get_last_updated('market_size')}")
-            # Update report with existing data
-            report.update_market_size(memory.memory.get("market_size", ""))
+            print(f"Last updated: {report.get_last_updated('market_size')}")
 
         # Key Players Research
-        if not memory.has_competitor_data():
+        if not report.has_competitor_data():
             print("\nResearching key players and competitive landscape...")
             query = f"""Analyze the competitive landscape for {topic}:
                 - Market leaders and their market share
@@ -100,17 +95,14 @@ async def run_product_research(topic: str):
             if not key_players:
                 print("Warning: No key players data found")
             else:
-                memory.add_competitor_data(key_players)
                 report.update_key_players(key_players)
                 print("✓ Competitor research complete")
         else:
             print("\nSkipping competitor research - data already exists")
-            print(f"Last updated: {memory.get_last_updated('competitors')}")
-            # Update report with existing data
-            report.update_key_players(memory.memory.get("competitors", ""))
+            print(f"Last updated: {report.get_last_updated('competitors')}")
 
         # Market Trends Research
-        if not memory.has_trend_data():
+        if not report.has_trend_data():
             print("\nResearching market trends and developments...")
             query = f"""Analyze current and emerging trends in {topic}:
                 - Key market trends and developments
@@ -124,17 +116,14 @@ async def run_product_research(topic: str):
             if not trends:
                 print("Warning: No trend data found")
             else:
-                memory.add_trend_data(trends)
                 report.update_market_trends(trends)
                 print("✓ Market trends research complete")
         else:
             print("\nSkipping trends research - data already exists")
-            print(f"Last updated: {memory.get_last_updated('trends')}")
-            # Update report with existing data
-            report.update_market_trends(memory.memory.get("trends", ""))
+            print(f"Last updated: {report.get_last_updated('trends')}")
 
         # Technical Research
-        if not memory.has_technical_data():
+        if not report.has_technical_data():
             print("\nResearching technical aspects and implementation...")
             query = f"""Analyze the technical aspects of {topic}:
                 - Core technologies and frameworks
@@ -148,17 +137,14 @@ async def run_product_research(topic: str):
             if not tech_findings:
                 print("Warning: No technical findings")
             else:
-                memory.add_technical_data(tech_findings)
                 report.update_tech_findings(tech_findings)
                 print("✓ Technical research complete")
         else:
             print("\nSkipping technical research - data already exists")
-            print(f"Last updated: {memory.get_last_updated('technical')}")
-            # Update report with existing data
-            report.update_tech_findings(memory.memory.get("technical", ""))
+            print(f"Last updated: {report.get_last_updated('technical')}")
 
         # Generate Executive Summary
-        if not memory.has_summary():
+        if not report.has_summary():
             print("\nGenerating executive summary...")
             query = f"""Based on all research findings, provide:
                 1. A concise executive summary
@@ -171,17 +157,14 @@ async def run_product_research(topic: str):
             if not summary or not detailed_report:
                 print("Warning: Could not generate summary")
             else:
-                memory.add_summary(summary)
                 report.update_summary(summary, detailed_report)
                 print("✓ Executive summary complete")
         else:
             print("\nSkipping summary - already exists")
-            print(f"Last updated: {memory.get_last_updated('summary')}")
-            # Update report with existing data
-            report.update_summary(memory.memory.get("summary", ""), "")
+            print(f"Last updated: {report.get_last_updated('summary')}")
 
-        print(f"\nResearch complete! Report saved to: {report.report_path}")
-        return report.report_path
+        print(f"\nResearch complete! Report saved to: {report.get_report_path()}")
+        return report.get_report_path()
 
     except Exception as e:
         print(f"Error during research: {str(e)}")
