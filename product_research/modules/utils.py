@@ -1,3 +1,6 @@
+import os
+from typing import Dict, List
+
 def extract_findings(messages):
     """Extract findings from agent messages"""
     if not messages:
@@ -72,3 +75,54 @@ def extract_summary(messages):
                         return content[start:end].strip()
                 return content.strip()
     return ""
+
+def write_summary_to_file(topic: str, market_findings: str, technical_findings: str, summary_content: str, report_file: str, sources: Dict[str, List[Dict[str, str]]] = None) -> None:
+    """Write research summary to a markdown file."""
+    try:
+        # Create reports directory if it doesn't exist
+        os.makedirs(os.path.dirname(report_file), exist_ok=True)
+        
+        # Format the report
+        report_content = f"""# Research Report: {topic}
+
+## Market Analysis
+{market_findings}
+
+## Technical Analysis
+{technical_findings}
+
+## Executive Summary
+{summary_content}
+"""
+
+        # Add sources if available
+        if sources:
+            report_content += "\n## Sources\n"
+            for section, section_sources in sources.items():
+                if section_sources:
+                    report_content += f"\n### {section.replace('_', ' ').title()}\n"
+                    # Sort sources by reference number if available
+                    sorted_sources = sorted(section_sources, 
+                                         key=lambda x: (x.get('reference_number', '999'), 
+                                                      x.get('url', x.get('identifier', ''))))
+                    for source in sorted_sources:
+                        if source.get('citation'):
+                            report_content += f"- [{source['reference_number']}] {source['citation']}\n  {source['url']}\n"
+                        elif source.get('url'):
+                            report_content += f"- {source['url']}\n"
+                        elif source.get('identifier'):
+                            if source['type'] == 'doi':
+                                report_content += f"- DOI: {source['identifier']}\n"
+                            elif source['type'] == 'arxiv':
+                                report_content += f"- arXiv: {source['identifier']}\n"
+                            elif source['type'] == 'report':
+                                report_content += f"- Market Report ({source['identifier']})\n"
+                            elif source['type'] == 'patent':
+                                report_content += f"- Patent {source['identifier']}\n"
+        
+        # Write to file
+        with open(report_file, 'w') as f:
+            f.write(report_content)
+            
+    except Exception as e:
+        print(f"Error writing summary to file: {str(e)}")
