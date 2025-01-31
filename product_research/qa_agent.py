@@ -119,7 +119,13 @@ class QAAgent:
         
         # Get QA's response
         print("\nChecking QA response...")
-        for msg in reversed(qa_response):
+        messages = qa_response.messages if hasattr(qa_response, 'messages') else qa_response
+        if not messages:
+            print("\nWarning: No messages from QA")
+            return False, "No messages from QA"
+            
+        # Find last message from QA
+        for msg in reversed(messages):
             if isinstance(msg, dict) and msg.get("name") == self.agent.name:
                 response = msg.get("content", "")
                 if response:
@@ -133,5 +139,5 @@ class QAAgent:
                         print("-" * 40)
                         return False, feedback
         
-        print("\nWarning: No clear response from QA")
+        print("\nWarning: No clear validation response from QA")
         return False, "No clear validation response from QA"

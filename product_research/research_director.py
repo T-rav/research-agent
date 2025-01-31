@@ -183,18 +183,31 @@ class ResearchDirector:
             
         return prompts[ReportSection(section)].format(topic=topic)
     
-    def _extract_research_content(self, chat_response: List[Dict]) -> str:
-        """Extract research content from chat response"""
-        content = None
-        for msg in reversed(chat_response):
-            if isinstance(msg, dict) and msg.get("name") == "Research_Lead":
-                content = msg.get("content", "")
-                if "TERMINATE" in content:
-                    return content.split("TERMINATE")[0].strip()
+    def _extract_research_content(self, chat_response) -> str:
+        """Extract research content from chat response
         
-        if not content:
-            raise ValueError("No research content found in chat")
-        return content
+        Args:
+            chat_response: The chat response from autogen
+            
+        Returns:
+            The research content
+        """
+        # Get messages from chat response
+        messages = chat_response.messages if hasattr(chat_response, 'messages') else chat_response
+        if not messages:
+            raise ValueError("No messages in chat response")
+            
+        # Find last message from research team
+        for msg in reversed(messages):
+            if isinstance(msg, dict):
+                content = msg.get("content", "")
+                if content:
+                    # Remove any TERMINATE markers
+                    if "TERMINATE" in content:
+                        content = content.split("TERMINATE")[0].strip()
+                    return content
+                
+        raise ValueError("No research content found in chat")
     
     def research_full_topic(self, topic: str) -> Tuple[str, List[str]]:
         """Research all sections for a topic
