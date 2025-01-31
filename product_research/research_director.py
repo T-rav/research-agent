@@ -183,7 +183,7 @@ class ResearchDirector:
             
         return prompts[ReportSection(section)].format(topic=topic)
     
-    def _extract_research_content(self, chat_response) -> str:
+    def _extract_research_content(self, chat_response):
         """Extract research content from chat response
         
         Args:
@@ -192,22 +192,30 @@ class ResearchDirector:
         Returns:
             The research content
         """
-        # Get messages from chat response
-        messages = chat_response.messages if hasattr(chat_response, 'messages') else chat_response
-        if not messages:
-            raise ValueError("No messages in chat response")
+        # Get last message from the chat
+        if hasattr(chat_response, 'last_message'):
+            content = chat_response.last_message.get("content", "")
+        else:
+            # Fallback for older versions or different response types
+            messages = chat_response.messages if hasattr(chat_response, 'messages') else chat_response
+            if not messages:
+                raise ValueError("No messages in chat response")
             
-        # Find last message from research team
-        for msg in reversed(messages):
-            if isinstance(msg, dict):
-                content = msg.get("content", "")
-                if content:
-                    # Remove any TERMINATE markers
-                    if "TERMINATE" in content:
-                        content = content.split("TERMINATE")[0].strip()
-                    return content
-                
-        raise ValueError("No research content found in chat")
+            # Get the last message
+            last_msg = messages[-1] if isinstance(messages, (list, tuple)) else messages
+            if isinstance(last_msg, dict):
+                content = last_msg.get("content", "")
+            else:
+                content = str(last_msg)
+
+        if not content:
+            raise ValueError("No research content found in chat")
+            
+        # Remove any TERMINATE markers
+        if "TERMINATE" in content:
+            content = content.split("TERMINATE")[0].strip()
+            
+        return content
     
     def research_full_topic(self, topic: str) -> Tuple[str, List[str]]:
         """Research all sections for a topic
