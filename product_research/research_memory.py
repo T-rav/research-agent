@@ -12,7 +12,9 @@ class ResearchMemory:
         # Create safe filename
         safe_filename = "".join(x for x in topic if x.isalnum() or x in (' ', '-', '_')).rstrip()
         safe_filename = safe_filename.replace(' ', '_').lower()
-        self.memory_file = self.memory_dir / f"{safe_filename}_memory.json"
+        
+        # Store memory file in topic subdirectory
+        self.memory_file = self.memory_dir / safe_filename / "memory.json"
         
         # Initialize or load memory
         self.memory = self._load_memory()
@@ -56,6 +58,12 @@ class ResearchMemory:
     
     def save(self) -> None:
         """Save memory to file."""
+        # Ensure directory exists
+        if not self.memory_dir.exists():
+            self.memory_dir.mkdir(parents=True)
+        if not self.memory_file.parent.exists():
+            self.memory_file.parent.mkdir(parents=True)
+            
         with open(self.memory_file, 'w') as f:
             json.dump(self.memory, f, indent=2)
     
@@ -63,74 +71,80 @@ class ResearchMemory:
         """Update timestamp for a section."""
         self.memory[f"{section}_updated"] = datetime.now().isoformat()
     
+    def has_section(self, section: str) -> bool:
+        """Check if a section has content"""
+        return bool(self.memory.get(section, ""))
+    
+    def get_section(self, section: str) -> str:
+        """Get content for a section"""
+        return self.memory.get(section, "")
+    
+    def set_section(self, section: str, content: str) -> None:
+        """Update content for a section"""
+        self.memory[section] = content
+        self._update_timestamp(section)
+        self.save()
+
+    # Legacy methods for backward compatibility
     def has_market_size_data(self) -> bool:
         """Check if market size data exists."""
-        return bool(self.memory.get("market_size", ""))
+        return self.has_section("market_size")
     
     def has_competitor_data(self) -> bool:
         """Check if competitor data exists."""
-        return bool(self.memory.get("competitors", ""))
+        return self.has_section("competitors")
     
     def has_trend_data(self) -> bool:
         """Check if trend data exists."""
-        return bool(self.memory.get("trends", ""))
+        return self.has_section("trends")
     
     def has_technical_data(self) -> bool:
         """Check if technical data exists."""
-        return bool(self.memory.get("technical", ""))
+        return self.has_section("technical")
     
     def has_summary(self) -> bool:
         """Check if summary exists."""
-        return bool(self.memory.get("summary", ""))
-    
-    def get_last_updated(self, section: str) -> str:
-        """Get when a section was last updated."""
-        return self.memory.get(f"{section}_updated", "")
+        return self.has_section("summary")
     
     def get_market_size(self) -> str:
         """Get market size data"""
-        return self.memory.get("market_size", "")
+        return self.get_section("market_size")
     
     def get_competitors(self) -> str:
         """Get competitor data"""
-        return self.memory.get("competitors", "")
+        return self.get_section("competitors")
     
     def get_trends(self) -> str:
         """Get trend data"""
-        return self.memory.get("trends", "")
+        return self.get_section("trends")
     
     def get_technical(self) -> str:
         """Get technical data"""
-        return self.memory.get("technical", "")
+        return self.get_section("technical")
     
     def get_summary(self) -> str:
         """Get summary"""
-        return self.memory.get("summary", "")
+        return self.get_section("summary")
     
     def add_market_size_data(self, data: str) -> None:
         """Add market size research data."""
-        self.memory["market_size"] = data
-        self._update_timestamp("market_size")
+        self.set_section("market_size", data)
     
     def add_competitor_data(self, data: str) -> None:
         """Add competitor research data."""
-        self.memory["competitors"] = data
-        self._update_timestamp("competitors")
+        self.set_section("competitors", data)
     
     def add_trend_data(self, data: str) -> None:
         """Add trend research data."""
-        self.memory["trends"] = data
-        self._update_timestamp("trends")
+        self.set_section("trends", data)
     
     def add_technical_data(self, data: str) -> None:
         """Add technical research data."""
-        self.memory["technical"] = data
-        self._update_timestamp("technical")
+        self.set_section("technical", data)
     
     def add_summary(self, summary: str) -> None:
         """Add summary."""
-        self.memory["summary"] = summary
-        self._update_timestamp("summary")
+        self.set_section("summary", summary)
     
     def add_source(self, section: str, source: str) -> None:
         """Add a source to a section if not already present."""
@@ -148,3 +162,7 @@ class ResearchMemory:
     def format_source_for_report(self, source: str) -> str:
         """Format a source for the report."""
         return source
+
+    def get_last_updated(self, section: str) -> str:
+        """Get when a section was last updated."""
+        return self.memory.get(f"{section}_updated", "")

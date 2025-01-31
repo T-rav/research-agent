@@ -23,10 +23,12 @@ class ResearchReport:
         safe_filename = "".join(x for x in topic if x.isalnum() or x in (' ', '-', '_')).rstrip()
         safe_filename = safe_filename.replace(' ', '_').lower()
         
-        # Setup paths
-        os.makedirs("reports", exist_ok=True)
-        self.json_path = f"reports/research_data_{safe_filename}.json"
-        self.report_path = f"reports/product_research_report_{safe_filename}.md"
+        # Setup paths under research_memory
+        self.json_path = f"research_memory/{safe_filename}/metadata.json"
+        self.report_path = f"research_memory/{safe_filename}/report.md"
+        
+        # Create directory
+        os.makedirs(os.path.dirname(self.json_path), exist_ok=True)
         
         # Load existing data if available, otherwise create empty files
         if os.path.exists(self.json_path):
@@ -36,14 +38,29 @@ class ResearchReport:
             self.save()
             # Create empty markdown report
             self._write_markdown()
-    
+
     def to_dict(self) -> Dict:
         """Convert report metadata to dictionary for JSON serialization"""
         return {
             "topic": self.topic,
             "created_at": self.created_at,
             "last_updated": self.last_updated,
-            "version": self.version
+            "version": self.version,
+            # Include section status from memory
+            "sections": {
+                "market_size": self._memory.has_market_size_data(),
+                "competitors": self._memory.has_competitor_data(),
+                "trends": self._memory.has_trend_data(),
+                "technical": self._memory.has_technical_data(),
+                "summary": self._memory.has_summary()
+            },
+            "section_timestamps": {
+                "market_size": self._memory.get_last_updated("market_size"),
+                "competitors": self._memory.get_last_updated("competitors"),
+                "trends": self._memory.get_last_updated("trends"),
+                "technical": self._memory.get_last_updated("technical"),
+                "summary": self._memory.get_last_updated("summary")
+            }
         }
     
     def from_dict(self, data: Dict) -> None:
@@ -151,17 +168,7 @@ class ResearchReport:
         Args:
             section: Section name to check
         """
-        if section == "market_size":
-            return self._memory.has_market_size_data()
-        elif section == "competitors":
-            return self._memory.has_competitor_data()
-        elif section == "trends":
-            return self._memory.has_trend_data()
-        elif section == "technical":
-            return self._memory.has_technical_data()
-        elif section == "summary":
-            return self._memory.has_summary()
-        return False
+        return self._memory.has_section(section)
     
     def get_section_updated(self, section: str) -> str:
         """Get when a section was last updated
