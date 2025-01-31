@@ -2,6 +2,8 @@ import os
 from openai import OpenAI
 import arxiv
 from dotenv import load_dotenv
+import requests
+import json
 
 # Load environment variables
 load_dotenv()
@@ -94,6 +96,62 @@ def arxiv_search(query: str, max_results: int = 3) -> str:
         return "No papers found matching the query."
         
     return "\n\n".join(formatted_results)
+
+def search_serper(query: str) -> str:
+    """Search using Serper.dev API
+    
+    Args:
+        query: Search query
+        
+    Returns:
+        JSON string of search results including:
+        - organic results (title, link, snippet)
+        - knowledge graph if available
+        - related questions if available
+    """
+    api_key = os.getenv("SERPER_API_KEY")
+    if not api_key:
+        return "Error: Serper API key not found in environment variables"
+        
+    try:
+        url = "https://google.serper.dev/search"
+        
+        payload = json.dumps({
+            "q": query,
+            "num": 5  # Number of results
+        })
+        
+        headers = {
+            'X-API-KEY': api_key,
+            'Content-Type': 'application/json'
+        }
+        
+        response = requests.post(url, headers=headers, data=payload)
+        
+        if response.status_code == 200:
+            results = response.json()
+            
+            # Format results nicely
+            formatted = {
+                "organic": [],
+                "knowledge_graph": results.get("knowledgeGraph", {}),
+                "related": results.get("relatedSearches", [])
+            }
+            
+            # Format organic results
+            for result in results.get("organic", []):
+                formatted["organic"].append({
+                    "title": result.get("title", ""),
+                    "link": result.get("link", ""),
+                    "snippet": result.get("snippet", "")
+                })
+                
+            return json.dumps(formatted, indent=2)
+        else:
+            return f"Error: Serper API returned status code {response.status_code}"
+            
+    except Exception as e:
+        return f"Error searching Serper: {str(e)}"
 
 # todo : serper.dev with customer scraper - paywalls? DiffBot for scraping?, aggregate with LLM?
 # todo : store fetched data to avoid api throttling and pricing

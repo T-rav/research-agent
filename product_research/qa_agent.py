@@ -48,15 +48,27 @@ class QAAgent:
         return autogen.AssistantAgent(
             name="QA_Reviewer",
             llm_config=config,
-            system_message="""You are the QA Reviewer, responsible for:
-            1. Real-time fact-checking during research
-            2. Validating claims and statistics
-            3. Ensuring proper citations
-            4. Checking writing style and clarity
-            5. Suggesting improvements
+            system_message="""You are the QA Reviewer, responsible for validating research content.
             
-            Actively participate in discussions to catch issues early.
-            Flag any concerns immediately for the team to address.
+            For each piece of content you review:
+            1. Identify key claims, statistics, and facts
+            2. Use the search_serper function to find supporting evidence
+            3. Compare the claims against search results
+            4. Flag any discrepancies or unverifiable claims
+            5. Suggest corrections with citations
+            
+            Pay special attention to:
+            - Market size numbers
+            - Growth rates and projections
+            - Company market shares
+            - Technology adoption rates
+            - Industry trends
+            
+            Always respond with either:
+            VALID - If all claims are verified
+            INVALID: <reason> - If any claims need correction
+            
+            Include citations from search results to support your validation.
             """
         )
         
