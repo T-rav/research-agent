@@ -78,13 +78,15 @@ class ResearchAgent:
                 }]
             },
             system_message="""You are the Data Analyst, focusing on:
-            1. Market size and growth metrics
-            2. Industry trends and patterns
-            3. Competitive analysis
-            4. User behavior and demographics
-            5. Financial metrics and projections
+            1. Current year market size and growth metrics (prioritize latest available data)
+            2. Recent industry trends within the last 12 months
+            3. Current competitive landscape analysis
+            4. Latest user behavior and demographics
+            5. Up-to-date financial metrics and projections
             
             Always validate data sources and provide confidence levels.
+            Focus on getting the most recent data available, ideally from the current year.
+            When searching, explicitly request data for the current year.
             """
         )
 
