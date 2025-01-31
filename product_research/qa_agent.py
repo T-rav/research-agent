@@ -34,7 +34,7 @@ class QAAgent:
         """
         config = self._get_base_config()
         
-        # Configure the function call
+        # Add function configuration
         config["functions"] = [{
             "name": "search_serper",
             "description": "Search the web for fact checking",
@@ -47,12 +47,7 @@ class QAAgent:
             }
         }]
         
-        # Add function map for actual implementation
-        config["function_map"] = {
-            "search_serper": search_serper
-        }
-        
-        return autogen.AssistantAgent(
+        agent = autogen.AssistantAgent(
             name="QA_Reviewer",
             llm_config=config,
             system_message="""You are the QA Reviewer, responsible for validating research content.
@@ -77,6 +72,13 @@ class QAAgent:
             """
         )
         
+        # Register function map
+        agent.function_map = {
+            "search_serper": search_serper
+        }
+        
+        return agent
+        
     def get_agent(self) -> autogen.AssistantAgent:
         """Get the QA agent instance
         
@@ -85,7 +87,7 @@ class QAAgent:
         """
         return self.agent
 
-    def validate_content(self, content: str, section: str, topic: str, proxy) -> Tuple[bool, str]:
+    async def validate_content(self, content: str, section: str, topic: str, proxy) -> Tuple[bool, str]:
         """Validate research content
         
         Args:
@@ -98,7 +100,7 @@ class QAAgent:
             Tuple of (is_valid: bool, feedback: str)
         """
         print("\nSending content to QA reviewer...")
-        qa_response = proxy.initiate_chat(
+        qa_response = await proxy.initiate_chat(
             self.agent,
             message=f"""Please validate this research content for {section} of {topic}. 
             Check for:
@@ -119,7 +121,13 @@ class QAAgent:
         
         # Get QA's response
         print("\nChecking QA response...")
-        messages = qa_response.messages if hasattr(qa_response, 'messages') else qa_response
+        if hasattr(qa_response, 'chat_history'):
+            messages = list(qa_response.chat_history)
+        elif hasattr(qa_response, 'messages'):
+            messages = list(qa_response.messages)
+        else:
+            messages = list(qa_response) if qa_response else []
+            
         if not messages:
             print("\nWarning: No messages from QA")
             return False, "No messages from QA"
@@ -138,6 +146,5 @@ class QAAgent:
                         print(feedback)
                         print("-" * 40)
                         return False, feedback
-        
-        print("\nWarning: No clear validation response from QA")
-        return False, "No clear validation response from QA"
+                        
+        return False, "No valid QA response found"

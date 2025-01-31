@@ -27,7 +27,7 @@ class ResearchDirector:
         research_agents = self.research.get_agents()
         
         # Create QA reviewer
-        self.qa = QAAgent().get_agent()
+        self.qa = QAAgent()
         
         # Create user proxy
         self.proxy = create_user_proxy()
@@ -55,7 +55,7 @@ class ResearchDirector:
         # Track reports by topic
         self.reports: Dict[str, ResearchReport] = {}
     
-    def research_topic(self, topic: str, section: str, attempt: int = 1, max_attempts: int = 3, qa_feedback: str = None) -> str:
+    async def research_topic(self, topic: str, section: str, attempt: int = 1, max_attempts: int = 3, qa_feedback: str = None) -> str:
         """Research a topic
         
         Args:
@@ -68,14 +68,14 @@ class ResearchDirector:
         Returns:
             Path to the research report
         """
-        print(f"\n{'='*80}")
+        print(f"\n{'=' * 80}")
         print(f"Starting research for {topic} - {section} (Attempt {attempt}/{max_attempts})")
-        print(f"{'='*80}")
+        print(f"{'=' * 80}\n")
         
         if attempt > max_attempts:
             print("\n⚠️  Max attempts reached. Using best available content.")
-            return "Error: Max attempts reached without valid content"
-        
+            return f"Error: Failed to produce valid content after {max_attempts} attempts"
+            
         # Get or create report
         report = self.reports.get(topic)
         if not report:
@@ -95,7 +95,7 @@ class ResearchDirector:
         print("-" * 40)
         
         # Start research chat
-        chat_response = self.proxy.initiate_chat(
+        chat_response = await self.proxy.initiate_chat(
             self.manager,
             message=task
         )
@@ -111,7 +111,7 @@ class ResearchDirector:
         
         # Have QA validate in a separate chat
         print("\nStarting QA validation...")
-        is_valid, feedback = self.qa.validate_content(content, section, topic, self.proxy)
+        is_valid, feedback = await self.qa.validate_content(content, section, topic, self.proxy)
         
         if is_valid:
             print("\n✓ Content validated by QA")
@@ -119,10 +119,9 @@ class ResearchDirector:
             report.set_section(section, content)
             print(f"\nSaved to report: {report.get_path()}")
             return report.get_path()
-        
+            
         print(f"\n✗ Content needs revision - attempt {attempt}/{max_attempts}")
-        # If not valid, retry research with QA feedback
-        return self.research_topic(topic, section, attempt + 1, max_attempts, feedback)
+        return await self.research_topic(topic, section, attempt + 1, max_attempts, feedback)
     
     def _get_research_prompt(self, section: str, topic: str) -> str:
         """Get the research prompt for a section"""
@@ -193,7 +192,15 @@ class ResearchDirector:
             The research content
         """
         # Get last message from the chat
-        if hasattr(chat_response, 'last_message'):
+        if hasattr(chat_response, 'chat_history'):
+            # Handle ChatResult object
+            if chat_response.chat_history:
+                last_msg = chat_response.chat_history[-1]
+                if isinstance(last_msg, dict):
+                    content = last_msg.get("content", "")
+                else:
+                    content = str(last_msg)
+        elif hasattr(chat_response, 'last_message'):
             content = chat_response.last_message.get("content", "")
         else:
             # Fallback for older versions or different response types
@@ -217,7 +224,7 @@ class ResearchDirector:
             
         return content
     
-    def research_full_topic(self, topic: str) -> Tuple[str, List[str]]:
+    async def research_full_topic(self, topic: str) -> Tuple[str, List[str]]:
         """Research all sections for a topic
         
         Args:
@@ -231,8 +238,8 @@ class ResearchDirector:
         
         # Just do market size section for testing
         section = ReportSection.MARKET_SIZE.value
-        result = self.research_topic(topic, section)
-        if result.startswith("Error"):
+        result = await self.research_topic(topic, section)
+        if isinstance(result, str) and result.startswith("Error"):
             warnings.append(f"Error researching {section}: {result}")
         else:
             report_path = result
