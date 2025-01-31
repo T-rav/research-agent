@@ -1,24 +1,41 @@
+"""Handles storage and retrieval of research data"""
 import os
 import json
-from pathlib import Path
-from typing import Dict, List
 from datetime import datetime
+from pathlib import Path
+from typing import Dict, List, Optional
 from report_sections import ReportSection
 
 class ResearchMemory:
+    """Manages storage and retrieval of research data"""
+    
+    # Base directory for all research artifacts
+    BASE_DIR = Path("research_memory")
+    
     def __init__(self, topic: str):
-        self.memory_dir = Path("research_memory")
-        self.topic = topic
+        """Initialize research memory
         
+        Args:
+            topic: Research topic
+        """
         # Create safe filename
         safe_filename = "".join(x for x in topic if x.isalnum() or x in (' ', '-', '_')).rstrip()
         safe_filename = safe_filename.replace(' ', '_').lower()
         
-        # Store memory file in topic subdirectory
-        self.memory_file = self.memory_dir / safe_filename / "memory.json"
+        # Setup paths
+        self.memory_dir = self.BASE_DIR / safe_filename
+        self.memory_file = self.memory_dir / "memory.json"
         
-        # Initialize or load memory
-        self.memory = self._load_memory()
+        print(f"\nInitializing memory at: {self.memory_file}")
+        
+        # Load or create memory
+        if self.memory_file.exists():
+            with open(self.memory_file, 'r') as f:
+                self.memory = json.load(f)
+        else:
+            self.memory = {str(section): "" for section in ReportSection} | {
+                f"{str(section)}_updated": "" for section in ReportSection
+            } | {"sources": {str(section): [] for section in ReportSection}}
         
         # Save initial state if file didn't exist
         if not self.memory_file.exists():
@@ -26,8 +43,8 @@ class ResearchMemory:
     
     def _load_memory(self) -> Dict:
         """Load memory from file if it exists, otherwise initialize empty."""
-        if not self.memory_dir.exists():
-            self.memory_dir.mkdir(parents=True)
+        if not self.BASE_DIR.exists():
+            self.BASE_DIR.mkdir(parents=True)
         
         if self.memory_file.exists():
             try:
@@ -43,14 +60,14 @@ class ResearchMemory:
 
     def save(self) -> None:
         """Save memory to file."""
+        print(f"\nSaving memory to {self.memory_file}")
         # Ensure directory exists
         if not self.memory_dir.exists():
             self.memory_dir.mkdir(parents=True)
-        if not self.memory_file.parent.exists():
-            self.memory_file.parent.mkdir(parents=True)
             
         with open(self.memory_file, 'w') as f:
             json.dump(self.memory, f, indent=2)
+        print(f"Saved memory: {json.dumps(self.memory, indent=2)}")
     
     def _update_timestamp(self, section: ReportSection) -> None:
         """Update timestamp for a section."""

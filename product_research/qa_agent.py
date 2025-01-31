@@ -33,6 +33,8 @@ class QAAgent:
             The configured QA agent
         """
         config = self._get_base_config()
+        
+        # Configure the function call
         config["functions"] = [{
             "name": "search_serper",
             "description": "Search the web for fact checking",
@@ -45,30 +47,33 @@ class QAAgent:
             }
         }]
         
+        # Add function map for actual implementation
+        config["function_map"] = {
+            "search_serper": search_serper
+        }
+        
         return autogen.AssistantAgent(
             name="QA_Reviewer",
             llm_config=config,
             system_message="""You are the QA Reviewer, responsible for validating research content.
             
-            For each piece of content you review:
-            1. Identify key claims, statistics, and facts
-            2. Use the search_serper function to find supporting evidence
-            3. Compare the claims against search results
-            4. Flag any discrepancies or unverifiable claims
-            5. Suggest corrections with citations
+            Your role is to:
+            1. Verify the accuracy of research content by cross-referencing with reliable sources
+            2. Check for completeness of required information
+            3. Ensure clarity and coherence
+            4. Verify citations and sources are provided where needed
             
-            Pay special attention to:
-            - Market size numbers
-            - Growth rates and projections
-            - Company market shares
-            - Technology adoption rates
-            - Industry trends
+            When validating content:
+            1. Use the search_serper function to fact check key claims and data points
+            2. Compare the research content against the search results
+            3. Look for any missing important information
+            4. Check that sources are reliable and current
             
-            Always respond with either:
-            VALID - If all claims are verified
-            INVALID: <reason> - If any claims need correction
+            Respond with either:
+            VALID - If the content meets all criteria
+            INVALID: <reason> - If the content needs improvement
             
-            Include citations from search results to support your validation.
+            Be thorough but efficient in your validation.
             """
         )
         
@@ -79,3 +84,54 @@ class QAAgent:
             The QA agent
         """
         return self.agent
+
+    def validate_content(self, content: str, section: str, topic: str, proxy) -> Tuple[bool, str]:
+        """Validate research content
+        
+        Args:
+            content: The content to validate
+            section: The section being validated
+            topic: The topic being researched
+            proxy: The user proxy for chat initiation
+            
+        Returns:
+            Tuple of (is_valid: bool, feedback: str)
+        """
+        print("\nSending content to QA reviewer...")
+        qa_response = proxy.initiate_chat(
+            self.agent,
+            message=f"""Please validate this research content for {section} of {topic}. 
+            Check for:
+            1. Accuracy and factual correctness
+            2. Completeness of required information
+            3. Clarity and coherence
+            4. Citations and sources where needed
+            
+            Content to validate:
+            {content}
+            
+            Respond with either:
+            VALID - If the content meets all criteria
+            INVALID: <reason> - If the content needs improvement
+            """,
+            silent=False
+        )
+        
+        # Get QA's response
+        print("\nChecking QA response...")
+        for msg in reversed(qa_response):
+            if isinstance(msg, dict) and msg.get("name") == self.agent.name:
+                response = msg.get("content", "")
+                if response:
+                    if response.startswith("VALID"):
+                        return True, ""
+                    elif "INVALID:" in response:
+                        feedback = response.split("INVALID:", 1)[1].strip()
+                        print(f"\nQA found issues:")
+                        print("-" * 40)
+                        print(feedback)
+                        print("-" * 40)
+                        return False, feedback
+        
+        print("\nWarning: No clear response from QA")
+        return False, "No clear validation response from QA"

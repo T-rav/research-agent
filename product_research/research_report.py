@@ -1,7 +1,9 @@
+"""Stores and formats research findings"""
 import os
 import json
 from typing import Dict, List, Tuple
 from datetime import datetime
+from pathlib import Path
 from research_memory import ResearchMemory
 from report_sections import ReportSection, get_section_config
 
@@ -25,8 +27,11 @@ class ResearchReport:
         safe_filename = safe_filename.replace(' ', '_').lower()
         
         # Setup paths under research_memory
-        self.json_path = f"research_memory/{safe_filename}/metadata.json"
-        self.report_path = f"research_memory/{safe_filename}/report.md"
+        base_dir = ResearchMemory.BASE_DIR
+        self.json_path = str(base_dir / safe_filename / "metadata.json")
+        self.report_path = str(base_dir / safe_filename / "report.md")
+        
+        print(f"\nInitializing report at: {self.json_path}")
         
         # Create directory
         os.makedirs(os.path.dirname(self.json_path), exist_ok=True)
@@ -74,12 +79,14 @@ class ResearchReport:
     
     def save(self) -> None:
         """Save report metadata and memory state"""
+        print(f"\nSaving report metadata to {self.json_path}")
         self._update_metadata()
         # Save memory state
         self._memory.save()
         # Save report metadata
         with open(self.json_path, 'w') as f:
             json.dump(self.to_dict(), f, indent=2)
+        print(f"Saved report metadata: {json.dumps(self.to_dict(), indent=2)}")
         # Generate markdown
         self._write_markdown()
     
@@ -195,6 +202,32 @@ Version: {self.version}
     def get_section_updated(self, section: ReportSection) -> str:
         """Get when a section was last updated"""
         return self._memory.get_last_updated(section)
+    
+    def set_section(self, section: str, content: str) -> None:
+        """Set content for any section
+        
+        Args:
+            section: Section to set content for (must match a ReportSection value)
+            content: Content to set
+        """
+        # Convert section string to enum value
+        try:
+            # First check if it's already a ReportSection
+            if isinstance(section, ReportSection):
+                section_enum = section
+            else:
+                # Try to match the string value
+                section_enum = next(
+                    s for s in ReportSection 
+                    if str(s) == section or s.value == section
+                )
+            self._memory.set_section(section_enum, content)
+            self.save()
+        except (StopIteration, ValueError) as e:
+            valid_sections = [str(s) for s in ReportSection]
+            raise ValueError(
+                f"Invalid section '{section}'. Must be one of: {valid_sections}"
+            ) from e
     
     # Legacy methods for backward compatibility
     def get_market_size(self) -> str:
