@@ -1,4 +1,4 @@
-"""Boss module for orchestrating the research process"""
+"""Research Director module for orchestrating the research process"""
 import autogen
 from typing import Dict, List, Tuple, Optional
 from datetime import datetime
@@ -7,11 +7,11 @@ from .proxy_agent import create_user_proxy
 from .research_agent import ResearchAgent
 from .research_report import ResearchReport
 
-class Boss:
+class ResearchDirector:
     """Manages and orchestrates the research process"""
     
     def __init__(self, max_rounds: int = 12, human_input_mode: str = "NEVER"):
-        """Initialize the boss
+        """Initialize the research director
         
         Args:
             max_rounds: Maximum number of conversation rounds
@@ -205,3 +205,26 @@ class Boss:
                     
             except Exception as e:
                 return f"Error in research: {str(e)}"
+
+    async def research_full_topic(self, topic: str) -> Tuple[str, List[str]]:
+        """Research all sections for a topic
+        
+        Args:
+            topic: The product/technology to research
+            
+        Returns:
+            Tuple of (report_path, List[warnings])
+        """
+        warnings = []
+        report_path = None
+        
+        # Research each section
+        sections = ["market_size", "competitors", "trends", "technical", "summary"]
+        for section in sections:
+            result = await self.research_topic(topic, section)
+            if result.startswith("Error"):
+                warnings.append(result)
+            else:
+                report_path = result
+                
+        return report_path, warnings
