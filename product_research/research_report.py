@@ -3,6 +3,7 @@ import json
 from typing import Dict, List, Tuple
 from datetime import datetime
 from research_memory import ResearchMemory
+from report_sections import ReportSection, get_section_config
 
 class ResearchReport:
     """Stores and formats research findings"""
@@ -48,18 +49,12 @@ class ResearchReport:
             "version": self.version,
             # Include section status from memory
             "sections": {
-                "market_size": self._memory.has_market_size_data(),
-                "competitors": self._memory.has_competitor_data(),
-                "trends": self._memory.has_trend_data(),
-                "technical": self._memory.has_technical_data(),
-                "summary": self._memory.has_summary()
+                str(section): self._memory.has_section(section)
+                for section in ReportSection
             },
             "section_timestamps": {
-                "market_size": self._memory.get_last_updated("market_size"),
-                "competitors": self._memory.get_last_updated("competitors"),
-                "trends": self._memory.get_last_updated("trends"),
-                "technical": self._memory.get_last_updated("technical"),
-                "summary": self._memory.get_last_updated("summary")
+                str(section): self._memory.get_last_updated(section)
+                for section in ReportSection
             }
         }
     
@@ -83,8 +78,6 @@ class ResearchReport:
         # Save report metadata
         with open(self.json_path, 'w') as f:
             json.dump(self.to_dict(), f, indent=2)
-        # Save memory state
-        self._memory.save()
         # Generate markdown
         self._write_markdown()
     
@@ -100,53 +93,67 @@ class ResearchReport:
     
     def _write_markdown(self) -> None:
         """Generate markdown report from current data"""
-        market_size = self.get_market_size()
-        competitors = self.get_competitors()
-        trends = self.get_trends()
-        technical = self.get_technical_findings()
-        summary = self.get_summary()
+        # Get section content
+        sections_content = {
+            section: self._memory.get_section(section)
+            for section in ReportSection
+        }
         
-        # Combine market findings
+        # Format market findings
         market_findings = ""
-        if market_size:
-            market_findings += f"# Market Size and Growth\n{market_size}\n\n"
-        if competitors:
-            market_findings += f"# Key Players and Companies\n{competitors}\n\n"
-        if trends:
-            market_findings += f"# Market Trends and Developments\n{trends}\n\n"
+        if sections_content[ReportSection.MARKET_SIZE]:
+            config = get_section_config(ReportSection.MARKET_SIZE)
+            market_findings += f"# {config.title}\n{sections_content[ReportSection.MARKET_SIZE]}\n\n"
+        if sections_content[ReportSection.COMPETITORS]:
+            config = get_section_config(ReportSection.COMPETITORS)
+            market_findings += f"# {config.title}\n{sections_content[ReportSection.COMPETITORS]}\n\n"
+        if sections_content[ReportSection.TRENDS]:
+            config = get_section_config(ReportSection.TRENDS)
+            market_findings += f"# {config.title}\n{sections_content[ReportSection.TRENDS]}\n\n"
+        
+        # Format technical findings
+        technical_findings = ""
+        if sections_content[ReportSection.TECHNICAL]:
+            config = get_section_config(ReportSection.TECHNICAL)
+            technical_findings = f"# {config.title}\n{sections_content[ReportSection.TECHNICAL]}\n\n"
+        
+        # Format summary
+        summary = ""
+        if sections_content[ReportSection.SUMMARY]:
+            config = get_section_config(ReportSection.SUMMARY)
+            summary = f"# {config.title}\n{sections_content[ReportSection.SUMMARY]}\n\n"
+        
+        # Format sources
+        sources = self.get_sources()
+        sources_section = ""
+        if any(sources.values()):
+            sources_section = "# Sources\n\n"
+            for section in ReportSection:
+                section_sources = sources[str(section)]
+                if section_sources:
+                    config = get_section_config(section)
+                    sources_section += f"## {config.title}\n"
+                    for source in section_sources:
+                        sources_section += f"- {source}\n"
+                    sources_section += "\n"
         
         # Format the complete report
-        report_content = f"""# Product Research Report: {self.topic}
-
-## Report Metadata
-- Generated: {self.created_at}
-- Last Updated: {self.last_updated}
-- Version: {self.version}
-
-## Executive Summary
+        report = f"""# Product Research Report: {self.topic}
 
 {summary}
-
-## Detailed Analysis
-
-### Market Research Findings:
 {market_findings}
+{technical_findings}
 
-### Technical Research Findings:
-{technical}
-
-## Sources
+{sources_section}
+---
+Generated by Research Team
+Last Updated: {self.last_updated}
+Version: {self.version}
 """
-        # Add sources
-        sources = self.get_sources()
-        for section, section_sources in sources.items():
-            if section_sources:
-                report_content += f"\n### {section.replace('_', ' ').title()}\n"
-                for source in section_sources:
-                    report_content += f"- {self._format_source(source)}\n"
         
+        # Write to file
         with open(self.report_path, 'w') as f:
-            f.write(report_content)
+            f.write(report)
     
     def get_path(self) -> str:
         """Get the path to the generated markdown report"""
@@ -154,30 +161,17 @@ class ResearchReport:
     
     def is_empty(self) -> bool:
         """Check if report has any content"""
-        return not any([
-            self.get_market_size(),
-            self.get_competitors(),
-            self.get_trends(),
-            self.get_technical_findings(),
-            self.get_summary()
-        ])
+        return not any(self._memory.has_section(section) for section in ReportSection)
     
-    def has_section(self, section: str) -> bool:
-        """Check if a section has content
-        
-        Args:
-            section: Section name to check
-        """
+    def has_section(self, section: ReportSection) -> bool:
+        """Check if a section has content"""
         return self._memory.has_section(section)
     
-    def get_section_updated(self, section: str) -> str:
-        """Get when a section was last updated
-        
-        Args:
-            section: Section name to check
-        """
+    def get_section_updated(self, section: ReportSection) -> str:
+        """Get when a section was last updated"""
         return self._memory.get_last_updated(section)
     
+    # Legacy methods for backward compatibility
     def get_market_size(self) -> str:
         """Get market size analysis"""
         return self._memory.get_market_size()
@@ -226,7 +220,3 @@ class ResearchReport:
     def get_sources(self) -> Dict[str, List[str]]:
         """Get all sources"""
         return self._memory.get_all_sources()
-    
-    def _format_source(self, source: str) -> str:
-        """Format a source for the report"""
-        return self._memory.format_source_for_report(source)
