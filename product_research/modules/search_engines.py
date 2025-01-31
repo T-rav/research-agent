@@ -94,3 +94,8 @@ def arxiv_search(query: str, max_results: int = 3) -> str:
         return "No papers found matching the query."
         
     return "\n\n".join(formatted_results)
+
+# todo : serper.dev with customer scraper - paywalls? DiffBot for scraping?, aggregate with LLM?
+# todo : store fetched data to avoid api throttling and pricing
+# todo : feels like a second layer of index sources is needed 
+# - like if I can query my local knowledge why check with the internet?

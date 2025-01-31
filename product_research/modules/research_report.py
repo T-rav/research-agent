@@ -1,13 +1,15 @@
 import os
 import json
-from typing import Dict, List
+from typing import Dict, List, Tuple
 from datetime import datetime
 from .research_memory import ResearchMemory
+from .qa_agent import QAAgent
 
 class ResearchReport:
     def __init__(self, topic: str):
         self.topic = topic
         self._memory = ResearchMemory(topic)  # Internal implementation detail
+        self._qa_agent = QAAgent()  # QA agent for content validation
         self.created_at = datetime.now().isoformat()
         self.last_updated = self.created_at
         self.version = "1.0.0"
@@ -23,6 +25,32 @@ class ResearchReport:
         
         # Load existing data if available
         self.load()
+    
+    async def _validate_content(self, section: str, content: str) -> Tuple[str, List[str]]:
+        """
+        Validate content with QA agent
+        Returns: (validated_content, warnings)
+        """
+        is_valid, corrections, improvements = await self._qa_agent.validate_content(section, content)
+        warnings = []
+        
+        if not is_valid:
+            warnings.extend([f"Warning: {correction}" for correction in corrections])
+            # Log improvements as suggestions
+            warnings.extend([f"Suggestion: {improvement}" for improvement in improvements])
+            
+            print("\nContent validation results:")
+            print("\nCorrections needed:")
+            for correction in corrections:
+                print(f"- {correction}")
+            print("\nStyle improvements suggested:")
+            for improvement in improvements:
+                print(f"- {improvement}")
+            
+            # For now, we'll still save the content but with warnings
+            # In the future, we might want to make this configurable
+        
+        return content, warnings
     
     def to_dict(self) -> Dict:
         """Convert report metadata to dictionary for JSON serialization"""

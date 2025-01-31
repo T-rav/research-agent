@@ -29,142 +29,181 @@ def extract_summary(content: str) -> str:
     return summary
 
 async def run_product_research(topic: str):
-    """
-    Run comprehensive product research on a given topic.
-    """
-    print(f"\nResearching topic: {topic}")
+    """Run product research on a given topic"""
+    # Initialize agents
+    researcher = autogen.AssistantAgent(
+        name="researcher",
+        system_message="""You are an expert product researcher. Your task is to:
+            1. Research the given topic thoroughly
+            2. Analyze market size, competitors, and trends
+            3. Provide technical analysis and recommendations
+            4. Write clear, concise, and factual content
+            5. Always cite your sources""",
+        llm_config={"temperature": 0.7}
+    )
     
-    # Initialize report
+    fact_checker = autogen.AssistantAgent(
+        name="fact_checker",
+        system_message="""You are a meticulous fact checker. Your role is to:
+            1. Verify factual claims using Serper search results
+            2. Flag any claims that cannot be verified
+            3. Check numbers and statistics for accuracy
+            4. Ensure all claims have proper citations
+            5. Suggest corrections if needed
+            
+            Always cite your sources when suggesting corrections.""",
+        llm_config={"temperature": 0.3}
+    )
+    
+    style_reviewer = autogen.AssistantAgent(
+        name="style_reviewer",
+        system_message="""You are a professional editor focusing on style and clarity. Your role is to:
+            1. Check for consistent tone and voice
+            2. Remove redundant information
+            3. Ensure proper flow between sections
+            4. Flag unclear or ambiguous statements
+            5. Improve readability
+            
+            Focus on making the content professional and accessible.""",
+        llm_config={"temperature": 0.7}
+    )
+    
+    user_proxy = autogen.UserProxyAgent(
+        name="user_proxy",
+        human_input_mode="NEVER",
+        max_consecutive_auto_reply=10,
+        is_termination_msg=lambda x: x.get("content", "").rstrip().endswith("TASK_COMPLETE")
+    )
+    
+    # Create group chat for collaborative research and review
+    groupchat = autogen.GroupChat(
+        agents=[researcher, fact_checker, style_reviewer, user_proxy],
+        messages=[],
+        max_round=12
+    )
+    manager = autogen.GroupChatManager(groupchat=groupchat)
+    
     report = ResearchReport(topic)
     
     try:
-        # Create agents
-        agents = create_agents()
-        research_lead = agents["lead"]
-        user_proxy = agents["proxy"]
-
-        # Initialize group chat
-        groupchat = autogen.GroupChat(
-            agents=[
-                agents["lead"],
-                agents["analyst"], 
-                agents["researcher"],
-                agents["reviewer"],
-                agents["proxy"]
-            ],
-            messages=[],
-            max_round=12
+        # Research market size
+        market_size_query = f"""Task: Research and write about market size for {topic}.
+            
+            Requirements:
+            1. Research current market value, growth rate, and projections
+            2. Verify all numbers and statistics
+            3. Ensure clear writing style and flow
+            4. Include proper citations
+            
+            Process:
+            1. Researcher: Conduct initial research and write content
+            2. Fact Checker: Verify all claims and numbers
+            3. Style Reviewer: Review writing quality
+            4. All: Iterate until content is accurate and well-written
+            
+            End your message with TASK_COMPLETE when finished."""
+        
+        content = await user_proxy.initiate_chat(
+            manager,
+            message=market_size_query
         )
+        report.set_market_size(content)
         
-        # Create manager
-        manager = autogen.GroupChatManager(groupchat=groupchat)
+        # Research competitors
+        competitor_query = f"""Task: Research and write about competitors in {topic} market.
+            
+            Requirements:
+            1. Research market share, strengths, and weaknesses
+            2. Verify company information and statistics
+            3. Ensure clear writing style and flow
+            4. Include proper citations
+            
+            Process:
+            1. Researcher: Conduct initial research and write content
+            2. Fact Checker: Verify all claims and numbers
+            3. Style Reviewer: Review writing quality
+            4. All: Iterate until content is accurate and well-written
+            
+            End your message with TASK_COMPLETE when finished."""
         
-        # Market Size Research
-        if not report.has_section('market_size'):
-            print("\nResearching market size and opportunity...")
-            query = f"""Research the market size and growth potential for {topic}:
-                - Total addressable market (TAM)
-                - Current market value and CAGR
-                - Regional market breakdown
-                - Key growth drivers and market dynamics
-                
-                Prioritize data from industry reports, market research firms, and financial analyses."""
-            results = await run_team_research(query, user_proxy, research_lead, manager)
-            market_size = extract_findings(results)
-            if not market_size:
-                print("Warning: No market size data found")
-            else:
-                report.set_market_size(market_size)
-                print("✓ Market size research complete")
-        else:
-            print("\nSkipping market size research - data already exists")
-            print(f"Last updated: {report.get_section_updated('market_size')}")
-
-        # Key Players Research
-        if not report.has_section('competitors'):
-            print("\nResearching key players and competitive landscape...")
-            query = f"""Analyze the competitive landscape for {topic}:
-                - Market leaders and their market share
-                - Key differentiators and value propositions
-                - Business models and pricing strategies
-                - Strategic partnerships and acquisitions
-                
-                Focus on company reports, investor presentations, and industry analyses."""
-            results = await run_team_research(query, user_proxy, research_lead, manager)
-            key_players = extract_findings(results)
-            if not key_players:
-                print("Warning: No key players data found")
-            else:
-                report.set_competitors(key_players)
-                print("✓ Competitor research complete")
-        else:
-            print("\nSkipping competitor research - data already exists")
-            print(f"Last updated: {report.get_section_updated('competitors')}")
-
-        # Market Trends Research
-        if not report.has_section('trends'):
-            print("\nResearching market trends and developments...")
-            query = f"""Analyze current and emerging trends in {topic}:
-                - Key market trends and developments
-                - Emerging technologies and innovations
-                - Consumer behavior and preferences
-                - Regulatory landscape and compliance
-                
-                Focus on recent industry reports, news, and analyst insights."""
-            results = await run_team_research(query, user_proxy, research_lead, manager)
-            trends = extract_findings(results)
-            if not trends:
-                print("Warning: No trend data found")
-            else:
-                report.set_trends(trends)
-                print("✓ Market trends research complete")
-        else:
-            print("\nSkipping trends research - data already exists")
-            print(f"Last updated: {report.get_section_updated('trends')}")
-
-        # Technical Research
-        if not report.has_section('technical'):
-            print("\nResearching technical aspects and implementation...")
-            query = f"""Analyze the technical aspects of {topic}:
-                - Core technologies and frameworks
-                - Implementation challenges
-                - Infrastructure requirements
-                - Technical skills and expertise needed
-                
-                Focus on technical documentation, developer resources, and engineering blogs."""
-            results = await run_team_research(query, user_proxy, research_lead, manager)
-            tech_findings = extract_findings(results)
-            if not tech_findings:
-                print("Warning: No technical findings")
-            else:
-                report.set_technical_findings(tech_findings)
-                print("✓ Technical research complete")
-        else:
-            print("\nSkipping technical research - data already exists")
-            print(f"Last updated: {report.get_section_updated('technical')}")
-
-        # Generate Executive Summary
-        if not report.has_section('summary'):
-            print("\nGenerating executive summary...")
-            query = f"""Based on all research findings, provide:
-                1. A concise executive summary
-                2. Top 3 product opportunities with clear rationale
-                
-                Use all the collected research data to support your conclusions."""
-            results = await run_team_research(query, user_proxy, research_lead, manager)
-            summary = extract_summary(results)
-            if not summary:
-                print("Warning: Could not generate summary")
-            else:
-                report.set_summary(summary)
-                print("✓ Executive summary complete")
-        else:
-            print("\nSkipping summary - already exists")
-            print(f"Last updated: {report.get_section_updated('summary')}")
-
-        print(f"\nResearch complete! Report saved to: {report.get_path()}")
-        return report.get_path()
-
+        content = await user_proxy.initiate_chat(
+            manager,
+            message=competitor_query
+        )
+        report.set_competitors(content)
+        
+        # Research trends
+        trends_query = f"""Task: Research and write about trends in {topic} market.
+            
+            Requirements:
+            1. Research technological, consumer, and regulatory trends
+            2. Verify trend information and predictions
+            3. Ensure clear writing style and flow
+            4. Include proper citations
+            
+            Process:
+            1. Researcher: Conduct initial research and write content
+            2. Fact Checker: Verify all claims and predictions
+            3. Style Reviewer: Review writing quality
+            4. All: Iterate until content is accurate and well-written
+            
+            End your message with TASK_COMPLETE when finished."""
+        
+        content = await user_proxy.initiate_chat(
+            manager,
+            message=trends_query
+        )
+        report.set_trends(content)
+        
+        # Technical analysis
+        technical_query = f"""Task: Research and write about technical aspects of {topic}.
+            
+            Requirements:
+            1. Research implementation considerations and challenges
+            2. Verify technical claims and solutions
+            3. Ensure clear writing style and flow
+            4. Include proper citations
+            
+            Process:
+            1. Researcher: Conduct initial research and write content
+            2. Fact Checker: Verify all technical claims
+            3. Style Reviewer: Review writing quality
+            4. All: Iterate until content is accurate and well-written
+            
+            End your message with TASK_COMPLETE when finished."""
+        
+        content = await user_proxy.initiate_chat(
+            manager,
+            message=technical_query
+        )
+        report.set_technical_findings(content)
+        
+        # Generate executive summary
+        summary_query = f"""Task: Write executive summary for {topic} research.
+            
+            Requirements:
+            1. Synthesize key points from all sections
+            2. Verify summary matches source content
+            3. Ensure clear writing style and flow
+            4. Include proper citations
+            
+            Process:
+            1. Researcher: Write initial summary
+            2. Fact Checker: Verify accuracy against source sections
+            3. Style Reviewer: Review writing quality
+            4. All: Iterate until summary is accurate and well-written
+            
+            End your message with TASK_COMPLETE when finished."""
+        
+        content = await user_proxy.initiate_chat(
+            manager,
+            message=summary_query
+        )
+        report.set_summary(content)
+        
+        print(f"\nResearch complete! Report saved to: {report.report_path}")
+        return report
+        
     except Exception as e:
         print(f"Error during research: {str(e)}")
         raise
