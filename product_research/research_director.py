@@ -1,11 +1,12 @@
-"""Research Director module for orchestrating the research process"""
-import autogen
-from typing import Dict, List, Tuple, Optional
-from datetime import datetime
-from qa_agent import QAAgent
+"""Research Director for orchestrating research process"""
+import os
+import json
+import asyncio
+from typing import Dict, List, Optional
 from proxy_agent import create_user_proxy
 from research_agent import ResearchAgent
 from research_report import ResearchReport
+from report_sections import ReportSection
 
 class ResearchDirector:
     """Manages and orchestrates the research process"""
@@ -66,7 +67,7 @@ class ResearchDirector:
                 
         # Map sections to research prompts
         prompts = {
-            "market_size": """Research and analyze the total addressable market size for {topic}.
+            ReportSection.MARKET_SIZE: """Research and analyze the total addressable market size for {topic}.
                 Focus on:
                 1. Current market value
                 2. Growth rate and projections
@@ -77,7 +78,7 @@ class ResearchDirector:
                 All team members collaborate to ensure accuracy and clarity.
                 End with TERMINATE when complete.""",
                 
-            "competitors": """Research and analyze the competitive landscape for {topic}.
+            ReportSection.COMPETITORS: """Research and analyze the competitive landscape for {topic}.
                 Focus on:
                 1. Key competitors and market share
                 2. Competitor strengths/weaknesses
@@ -88,7 +89,7 @@ class ResearchDirector:
                 All team members collaborate to ensure accuracy and clarity.
                 End with TERMINATE when complete.""",
                 
-            "trends": """Research and analyze market trends for {topic}.
+            ReportSection.TRENDS: """Research and analyze market trends for {topic}.
                 Focus on:
                 1. Current market trends
                 2. Emerging technologies
@@ -99,7 +100,7 @@ class ResearchDirector:
                 All team members collaborate to ensure accuracy and clarity.
                 End with TERMINATE when complete.""",
                 
-            "technical": """Provide technical analysis of {topic}.
+            ReportSection.TECHNICAL: """Provide technical analysis of {topic}.
                 Focus on:
                 1. Implementation considerations
                 2. Architecture and design
@@ -110,7 +111,7 @@ class ResearchDirector:
                 All team members collaborate to ensure accuracy and clarity.
                 End with TERMINATE when complete.""",
                 
-            "summary": """Create an executive summary of the research on {topic}.
+            ReportSection.SUMMARY: """Create an executive summary of the research on {topic}.
                 Focus on:
                 1. Key findings from all sections
                 2. Critical insights
@@ -122,12 +123,12 @@ class ResearchDirector:
                 End with TERMINATE when complete."""
         }
         
-        if section not in prompts:
+        if section not in [s.value for s in ReportSection]:
             raise ValueError(f"Unknown research section: {section}")
             
         while True:  # Keep trying until we get valid research
             # Start research task
-            message = prompts[section].format(topic=topic)
+            message = prompts[ReportSection(section)].format(topic=topic)
             try:
                 # Use proxy to initiate research
                 await self.proxy.initiate_chat(
@@ -176,15 +177,15 @@ class ResearchDirector:
                     
                 if qa_response.startswith("VALID"):
                     # Store validated content in report
-                    if section == "market_size":
+                    if section == ReportSection.MARKET_SIZE.value:
                         report.set_market_size(content)
-                    elif section == "competitors":
+                    elif section == ReportSection.COMPETITORS.value:
                         report.set_competitors(content)
-                    elif section == "trends":
+                    elif section == ReportSection.TRENDS.value:
                         report.set_trends(content)
-                    elif section == "technical":
+                    elif section == ReportSection.TECHNICAL.value:
                         report.set_technical_findings(content)
-                    elif section == "summary":
+                    elif section == ReportSection.SUMMARY.value:
                         report.set_summary(content)
                         
                     return report.get_path()
@@ -219,7 +220,7 @@ class ResearchDirector:
         report_path = None
         
         # Research each section
-        sections = ["market_size", "competitors", "trends", "technical", "summary"]
+        sections = [s.value for s in ReportSection]
         for section in sections:
             result = await self.research_topic(topic, section)
             if result.startswith("Error"):
