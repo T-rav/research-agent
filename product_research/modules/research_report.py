@@ -1,13 +1,13 @@
 import os
 import json
-from typing import Dict
+from typing import Dict, List
 from datetime import datetime
 from .research_memory import ResearchMemory
 
 class ResearchReport:
     def __init__(self, topic: str):
         self.topic = topic
-        self.memory = ResearchMemory(topic)
+        self._memory = ResearchMemory(topic)  # Internal implementation detail
         self.created_at = datetime.now().isoformat()
         self.last_updated = self.created_at
         self.version = "1.0.0"
@@ -25,7 +25,7 @@ class ResearchReport:
         self.load()
     
     def to_dict(self) -> Dict:
-        """Convert report to dictionary for JSON serialization"""
+        """Convert report metadata to dictionary for JSON serialization"""
         return {
             "topic": self.topic,
             "created_at": self.created_at,
@@ -34,7 +34,7 @@ class ResearchReport:
         }
     
     def from_dict(self, data: Dict) -> None:
-        """Load report from dictionary"""
+        """Load report metadata from dictionary"""
         self.topic = data.get("topic", self.topic)
         self.created_at = data.get("created_at", datetime.now().isoformat())
         self.last_updated = data.get("last_updated", self.created_at)
@@ -48,14 +48,18 @@ class ResearchReport:
         self.version = f"{major}.{minor}.{int(patch) + 1}"
     
     def save(self) -> None:
-        """Save report metadata to JSON file"""
+        """Save report metadata and memory state"""
         self._update_metadata()
+        # Save report metadata
         with open(self.json_path, 'w') as f:
             json.dump(self.to_dict(), f, indent=2)
+        # Save memory state
+        self._memory.save()
+        # Generate markdown
         self._write_markdown()
     
     def load(self) -> None:
-        """Load report metadata from JSON file if it exists"""
+        """Load report metadata if it exists"""
         if os.path.exists(self.json_path):
             with open(self.json_path, 'r') as f:
                 try:
@@ -65,12 +69,11 @@ class ResearchReport:
                     print(f"Warning: Could not load data from {self.json_path}")
     
     def _write_markdown(self) -> None:
-        """Write the report in markdown format using data from memory"""
-        # Get data from memory
-        market_size = self.get_market_size_data()
-        competitors = self.get_competitor_data()
-        trends = self.get_trend_data()
-        technical = self.get_technical_data()
+        """Generate markdown report from current data"""
+        market_size = self.get_market_size()
+        competitors = self.get_competitors()
+        trends = self.get_trends()
+        technical = self.get_technical_findings()
         summary = self.get_summary()
         
         # Combine market findings
@@ -104,114 +107,96 @@ class ResearchReport:
 
 ## Sources
 """
-        # Add sources from memory
-        sources = self.get_all_sources()
+        # Add sources
+        sources = self.get_sources()
         for section, section_sources in sources.items():
             if section_sources:
                 report_content += f"\n### {section.replace('_', ' ').title()}\n"
                 for source in section_sources:
-                    report_content += f"- {self.format_source_for_report(source)}\n"
+                    report_content += f"- {self._format_source(source)}\n"
         
         with open(self.report_path, 'w') as f:
             f.write(report_content)
     
-    def update_market_size(self, content: str) -> None:
-        """Update market size section and save"""
-        self.add_market_size_data(content)
-        self.save()
-    
-    def update_key_players(self, content: str) -> None:
-        """Update key players section and save"""
-        self.add_competitor_data(content)
-        self.save()
-    
-    def update_market_trends(self, content: str) -> None:
-        """Update market trends section and save"""
-        self.add_trend_data(content)
-        self.save()
-    
-    def update_tech_findings(self, content: str) -> None:
-        """Update technical findings section and save"""
-        self.add_technical_data(content)
-        self.save()
-    
-    def update_summary(self, summary: str, detailed_report: str = "") -> None:
-        """Update summary and save"""
-        self.add_summary(summary)
-        self.save()
-    
-    def get_report_path(self) -> str:
-        """Get the path to the markdown report"""
+    def get_path(self) -> str:
+        """Get the path to the generated markdown report"""
         return self.report_path
     
-    def has_market_size_data(self) -> bool:
-        """Check if market size data exists"""
-        return self.memory.has_market_size_data()
+    def is_empty(self) -> bool:
+        """Check if report has any content"""
+        return not any([
+            self.get_market_size(),
+            self.get_competitors(),
+            self.get_trends(),
+            self.get_technical_findings(),
+            self.get_summary()
+        ])
     
-    def has_competitor_data(self) -> bool:
-        """Check if competitor data exists"""
-        return self.memory.has_competitor_data()
+    def has_section(self, section: str) -> bool:
+        """Check if a section has content"""
+        content = {
+            'market_size': self.get_market_size,
+            'competitors': self.get_competitors,
+            'trends': self.get_trends,
+            'technical': self.get_technical_findings,
+            'summary': self.get_summary
+        }.get(section, lambda: None)()
+        return bool(content)
     
-    def has_trend_data(self) -> bool:
-        """Check if trend data exists"""
-        return self.memory.has_trend_data()
-    
-    def has_technical_data(self) -> bool:
-        """Check if technical data exists"""
-        return self.memory.has_technical_data()
-    
-    def has_summary(self) -> bool:
-        """Check if summary exists"""
-        return self.memory.has_summary()
-    
-    def get_last_updated(self, section: str) -> str:
+    def get_section_updated(self, section: str) -> str:
         """Get when a section was last updated"""
-        return self.memory.get_last_updated(section)
+        return self._memory.get_last_updated(section)
     
-    def get_market_size_data(self) -> str:
-        """Get market size data"""
-        return self.memory.get_market_size_data()
+    # Core report sections
+    def get_market_size(self) -> str:
+        """Get market size analysis"""
+        return self._memory.get_market_size()
     
-    def get_competitor_data(self) -> str:
-        """Get competitor data"""
-        return self.memory.get_competitor_data()
+    def set_market_size(self, content: str) -> None:
+        """Update market size analysis"""
+        self._memory.add_market_size_data(content)
+        self.save()
     
-    def get_trend_data(self) -> str:
-        """Get trend data"""
-        return self.memory.get_trend_data()
+    def get_competitors(self) -> str:
+        """Get competitor analysis"""
+        return self._memory.get_competitors()
     
-    def get_technical_data(self) -> str:
-        """Get technical data"""
-        return self.memory.get_technical_data()
+    def set_competitors(self, content: str) -> None:
+        """Update competitor analysis"""
+        self._memory.add_competitor_data(content)
+        self.save()
+    
+    def get_trends(self) -> str:
+        """Get market trends analysis"""
+        return self._memory.get_trends()
+    
+    def set_trends(self, content: str) -> None:
+        """Update market trends analysis"""
+        self._memory.add_trend_data(content)
+        self.save()
+    
+    def get_technical_findings(self) -> str:
+        """Get technical analysis"""
+        return self._memory.get_technical()
+    
+    def set_technical_findings(self, content: str) -> None:
+        """Update technical analysis"""
+        self._memory.add_technical_data(content)
+        self.save()
     
     def get_summary(self) -> str:
-        """Get summary"""
-        return self.memory.get_summary()
+        """Get executive summary"""
+        return self._memory.get_summary()
     
-    def get_all_sources(self) -> Dict:
-        """Get all sources"""
-        return self.memory.get_all_sources()
+    def set_summary(self, content: str) -> None:
+        """Update executive summary"""
+        self._memory.add_summary(content)
+        self.save()
     
-    def add_market_size_data(self, content: str) -> None:
-        """Add market size data"""
-        self.memory.add_market_size_data(content)
+    def get_sources(self) -> Dict[str, List[str]]:
+        """Get all sources used in the report"""
+        return self._memory.get_all_sources()
     
-    def add_competitor_data(self, content: str) -> None:
-        """Add competitor data"""
-        self.memory.add_competitor_data(content)
-    
-    def add_trend_data(self, content: str) -> None:
-        """Add trend data"""
-        self.memory.add_trend_data(content)
-    
-    def add_technical_data(self, content: str) -> None:
-        """Add technical data"""
-        self.memory.add_technical_data(content)
-    
-    def add_summary(self, summary: str) -> None:
-        """Add summary"""
-        self.memory.add_summary(summary)
-    
-    def format_source_for_report(self, source: str) -> str:
-        """Format source for report"""
-        return self.memory.format_source_for_report(source)
+    def _format_source(self, source: str) -> str:
+        """Format a source for the report"""
+        return self._memory.format_source_for_report(source)

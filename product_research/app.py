@@ -60,7 +60,7 @@ async def run_product_research(topic: str):
         manager = autogen.GroupChatManager(groupchat=groupchat)
         
         # Market Size Research
-        if not report.has_market_size_data():
+        if not report.has_section('market_size'):
             print("\nResearching market size and opportunity...")
             query = f"""Research the market size and growth potential for {topic}:
                 - Total addressable market (TAM)
@@ -74,14 +74,14 @@ async def run_product_research(topic: str):
             if not market_size:
                 print("Warning: No market size data found")
             else:
-                report.update_market_size(market_size)
+                report.set_market_size(market_size)
                 print("✓ Market size research complete")
         else:
             print("\nSkipping market size research - data already exists")
-            print(f"Last updated: {report.get_last_updated('market_size')}")
+            print(f"Last updated: {report.get_section_updated('market_size')}")
 
         # Key Players Research
-        if not report.has_competitor_data():
+        if not report.has_section('competitors'):
             print("\nResearching key players and competitive landscape...")
             query = f"""Analyze the competitive landscape for {topic}:
                 - Market leaders and their market share
@@ -95,14 +95,14 @@ async def run_product_research(topic: str):
             if not key_players:
                 print("Warning: No key players data found")
             else:
-                report.update_key_players(key_players)
+                report.set_competitors(key_players)
                 print("✓ Competitor research complete")
         else:
             print("\nSkipping competitor research - data already exists")
-            print(f"Last updated: {report.get_last_updated('competitors')}")
+            print(f"Last updated: {report.get_section_updated('competitors')}")
 
         # Market Trends Research
-        if not report.has_trend_data():
+        if not report.has_section('trends'):
             print("\nResearching market trends and developments...")
             query = f"""Analyze current and emerging trends in {topic}:
                 - Key market trends and developments
@@ -116,14 +116,14 @@ async def run_product_research(topic: str):
             if not trends:
                 print("Warning: No trend data found")
             else:
-                report.update_market_trends(trends)
+                report.set_trends(trends)
                 print("✓ Market trends research complete")
         else:
             print("\nSkipping trends research - data already exists")
-            print(f"Last updated: {report.get_last_updated('trends')}")
+            print(f"Last updated: {report.get_section_updated('trends')}")
 
         # Technical Research
-        if not report.has_technical_data():
+        if not report.has_section('technical'):
             print("\nResearching technical aspects and implementation...")
             query = f"""Analyze the technical aspects of {topic}:
                 - Core technologies and frameworks
@@ -137,14 +137,14 @@ async def run_product_research(topic: str):
             if not tech_findings:
                 print("Warning: No technical findings")
             else:
-                report.update_tech_findings(tech_findings)
+                report.set_technical_findings(tech_findings)
                 print("✓ Technical research complete")
         else:
             print("\nSkipping technical research - data already exists")
-            print(f"Last updated: {report.get_last_updated('technical')}")
+            print(f"Last updated: {report.get_section_updated('technical')}")
 
         # Generate Executive Summary
-        if not report.has_summary():
+        if not report.has_section('summary'):
             print("\nGenerating executive summary...")
             query = f"""Based on all research findings, provide:
                 1. A concise executive summary
@@ -153,18 +153,17 @@ async def run_product_research(topic: str):
                 Use all the collected research data to support your conclusions."""
             results = await run_team_research(query, user_proxy, research_lead, manager)
             summary = extract_summary(results)
-            detailed_report = extract_findings(results)
-            if not summary or not detailed_report:
+            if not summary:
                 print("Warning: Could not generate summary")
             else:
-                report.update_summary(summary, detailed_report)
+                report.set_summary(summary)
                 print("✓ Executive summary complete")
         else:
             print("\nSkipping summary - already exists")
-            print(f"Last updated: {report.get_last_updated('summary')}")
+            print(f"Last updated: {report.get_section_updated('summary')}")
 
-        print(f"\nResearch complete! Report saved to: {report.get_report_path()}")
-        return report.get_report_path()
+        print(f"\nResearch complete! Report saved to: {report.get_path()}")
+        return report.get_path()
 
     except Exception as e:
         print(f"Error during research: {str(e)}")
