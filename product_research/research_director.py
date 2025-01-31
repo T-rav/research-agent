@@ -6,7 +6,6 @@ import autogen
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 from proxy_agent import create_user_proxy
-from research_agent import ResearchAgent
 from research_report import ResearchReport
 from report_sections import ReportSection
 from qa_agent import QAAgent
@@ -36,7 +35,14 @@ class ResearchDirector:
         # Create manager
         self.manager = autogen.GroupChatManager(
             groupchat=self.group_chat,
-            llm_config=self.lead.llm_config
+            llm_config={
+                "config_list": autogen.config_list_from_json(
+                    "OAI_CONFIG_LIST",
+                    filter_dict={"model": ["gpt-4o-mini"]}
+                ),
+                "temperature": 0.1,
+                "model": "gpt-4o-mini"
+            }
         )
         
         # Track reports by topic
@@ -80,8 +86,8 @@ class ResearchDirector:
         
         {self._get_research_prompt(section, topic)}
         
-        If QA approves the content with "VALID", save it and finish.
-        If QA responds with "INVALID", address the feedback and try again.
+        If QA approves the content with "VALID:", save it and finish.
+        If QA responds with "INVALID:", address the feedback and try again.
         
         Previous QA feedback to address:
         {qa_feedback if qa_feedback else 'None'}
@@ -109,8 +115,9 @@ class ResearchDirector:
         for msg in reversed(messages):
             if msg.get("name") == "QA_Reviewer":
                 response = msg.get("content", "")
-                if response.startswith("VALID"):
+                if response.startswith("VALID:"):
                     is_valid = True
+                    print("\n✓ QA Approval:", response[6:].strip())
                     break
                 elif "INVALID:" in response:
                     feedback = response.split("INVALID:", 1)[1].strip()
@@ -249,41 +256,130 @@ class ResearchDirector:
             
         return content
 
-    def _create_research_lead(self):
-        # Create research lead agent
-        lead = ResearchAgent().get_agent()
-        lead.name = "Research_Lead"
-        lead.llm_config = {
+    def _create_research_lead(self) -> autogen.AssistantAgent:
+        """Create the Research Lead agent"""
+        config = {
             "config_list": autogen.config_list_from_json(
                 "OAI_CONFIG_LIST",
                 filter_dict={"model": ["gpt-4o-mini"]}
             ),
-            "temperature": 0.1
+            "temperature": 0.1,
+            "model": "gpt-4o-mini",
+            "functions": [{
+                "name": "perplexity_search",
+                "description": "Search using Perplexity AI",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {"type": "string"},
+                        "num_results": {"type": "integer", "default": 3}
+                    },
+                    "required": ["query"]
+                }
+            }]
         }
-        return lead
-
-    def _create_data_analyst(self):
-        # Create data analyst agent
-        analyst = ResearchAgent().get_agent()
-        analyst.name = "Data_Analyst"
-        analyst.llm_config = {
+        
+        return autogen.AssistantAgent(
+            name="Research_Lead",
+            system_message="""You are the Research Lead, responsible for:
+            1. Breaking down research requests into specific tasks
+            2. Delegating tasks to specialized team members
+            3. Reviewing and synthesizing findings
+            4. Ensuring quality and completeness
+            5. Providing final recommendations
+            
+            Work with your team:
+            - Data_Analyst: For market data and trends
+            - Tech_Researcher: For technical details
+            - QA_Reviewer: To validate content quality
+            
+            Coordinate the research process and ensure high quality output.
+            """,
+            llm_config=config,
+            function_map={
+                "perplexity_search": perplexity_search
+            }
+        )
+        
+    def _create_data_analyst(self) -> autogen.AssistantAgent:
+        """Create the Data Analyst agent"""
+        config = {
             "config_list": autogen.config_list_from_json(
                 "OAI_CONFIG_LIST",
                 filter_dict={"model": ["gpt-4o-mini"]}
             ),
-            "temperature": 0.1
+            "temperature": 0.1,
+            "model": "gpt-4o-mini",
+            "functions": [{
+                "name": "perplexity_search",
+                "description": "Search using Perplexity AI",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {"type": "string"},
+                        "num_results": {"type": "integer", "default": 3}
+                    },
+                    "required": ["query"]
+                }
+            }]
         }
-        return analyst
-
-    def _create_tech_researcher(self):
-        # Create technical researcher agent
-        researcher = ResearchAgent().get_agent()
-        researcher.name = "Tech_Researcher"
-        researcher.llm_config = {
+        
+        return autogen.AssistantAgent(
+            name="Data_Analyst",
+            system_message="""You are the Data Analyst, focusing on:
+            1. Current year market size and growth metrics
+            2. Recent industry trends within the last 12 months
+            3. Current competitive landscape analysis
+            4. Latest user behavior and demographics
+            5. Up-to-date financial metrics and projections
+            
+            Always validate data sources and provide confidence levels.
+            Focus on getting the most recent data available.
+            When searching, explicitly request data for the current year.
+            """,
+            llm_config=config,
+            function_map={
+                "perplexity_search": perplexity_search
+            }
+        )
+        
+    def _create_tech_researcher(self) -> autogen.AssistantAgent:
+        """Create the Technical Researcher agent"""
+        config = {
             "config_list": autogen.config_list_from_json(
                 "OAI_CONFIG_LIST",
                 filter_dict={"model": ["gpt-4o-mini"]}
             ),
-            "temperature": 0.1
+            "temperature": 0.1,
+            "model": "gpt-4o-mini",
+            "functions": [{
+                "name": "perplexity_search",
+                "description": "Search using Perplexity AI",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {"type": "string"},
+                        "num_results": {"type": "integer", "default": 3}
+                    },
+                    "required": ["query"]
+                }
+            }]
         }
-        return researcher
+        
+        return autogen.AssistantAgent(
+            name="Tech_Researcher",
+            system_message="""You are the Technical Researcher, focusing on:
+            1. Technical implementation details
+            2. Latest technological advancements
+            3. Development frameworks and tools
+            4. Technical challenges and solutions
+            5. Best practices and standards
+            
+            Ensure technical accuracy and provide practical insights.
+            Focus on current industry standards and emerging technologies.
+            """,
+            llm_config=config,
+            function_map={
+                "perplexity_search": perplexity_search
+            }
+        )

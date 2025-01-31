@@ -51,7 +51,7 @@ class QAAgent:
             4. Check that sources are reliable and current
             
             Respond with either:
-            VALID - If the content meets all criteria
+            VALID: If the content meets all criteria
             INVALID: <reason> - If the content needs improvement
             
             Be thorough but efficient in your validation.
