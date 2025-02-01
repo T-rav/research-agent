@@ -165,12 +165,36 @@ class ResearchDirector:
         warnings = []
         report_path = None
         
-        # Just do market size section for testing
-        section = ReportSection.MARKET_SIZE.value
-        report_path = await self.research_topic(topic, section)
+        # Research each section in order
+        sections = [
+            ReportSection.MARKET_SIZE,
+            ReportSection.COMPETITORS,
+            ReportSection.TRENDS,
+            ReportSection.TECHNICAL,
+            ReportSection.SUMMARY
+        ]
         
-        if not report_path:
-            warnings.append(f"Error researching {section}: No report generated")
+        print(f"\nStarting full research for: {topic}")
+        print("=" * 80)
+        
+        for section in sections:
+            print(f"\nResearching section: {section.value}")
+            section_path = await self.research_topic(topic, section.value)
+            
+            if not section_path:
+                warnings.append(f"Error researching {section.value}: No content generated")
+            else:
+                report_path = section_path
+                
+        if report_path:
+            print("\n✓ Research completed!")
+            print(f"Report saved to: {report_path}")
+            if warnings:
+                print("\n⚠️  Warnings during research:")
+                for warning in warnings:
+                    print(f"- {warning}")
+        else:
+            print("\n❌ Failed to generate report")
             
         return report_path or "", warnings
     
