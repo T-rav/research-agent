@@ -48,7 +48,7 @@ class ResearchDirector:
         # Track reports by topic
         self.reports: Dict[str, ResearchReport] = {}
         
-    async def research_topic(self, topic: str, section: str, attempt: int = 1, max_attempts: int = 3, qa_feedback: str = None) -> str:
+    async def research_topic(self, topic: str, section: str, attempt: int = 1, max_attempts: int = 3, qa_feedback: str = None, last_content: str = None) -> str:
         """Research a topic asynchronously
         
         Args:
@@ -57,6 +57,7 @@ class ResearchDirector:
             attempt: Current attempt number
             max_attempts: Maximum number of attempts before giving up
             qa_feedback: Feedback from previous QA validation
+            last_content: Content from previous attempt
             
         Returns:
             Path to the research report
@@ -66,8 +67,26 @@ class ResearchDirector:
         print(f"{'=' * 80}\n")
         
         if attempt > max_attempts:
-            print("\n⚠️  Max attempts reached. Using best available content.")
-            return f"Error: Failed to produce valid content after {max_attempts} attempts"
+            print(f"\n⚠️  Max attempts ({max_attempts}) reached. Using best available content.")
+            print("\nQA Feedback from attempts:")
+            print("-" * 40)
+            print(qa_feedback)
+            print("-" * 40)
+            
+            # Get or create report
+            report = self.reports.get(topic)
+            if not report:
+                print(f"\nCreating new report for {topic}")
+                report = ResearchReport(topic)
+                self.reports[topic] = report
+            
+            # Save content with warning
+            report.set_section(section, f"""WARNING: This content did not pass QA after {max_attempts} attempts.
+            Last QA feedback: {qa_feedback}
+            
+            {last_content}""")
+            print(f"\nSaved to report with warning: {report.get_path()}")
+            return report.get_path()
             
         # Get or create report
         report = self.reports.get(topic)
@@ -121,6 +140,7 @@ class ResearchDirector:
                     break
                 elif "INVALID:" in response:
                     feedback = response.split("INVALID:", 1)[1].strip()
+                    print("\n✗ QA Feedback:", feedback)
                     break
         
         if is_valid:
@@ -131,7 +151,7 @@ class ResearchDirector:
             return report.get_path()
             
         print(f"\n✗ Content needs revision - attempt {attempt}/{max_attempts}")
-        return await self.research_topic(topic, section, attempt + 1, max_attempts, feedback)
+        return await self.research_topic(topic, section, attempt + 1, max_attempts, feedback, content)
         
     async def research_full_topic(self, topic: str) -> Tuple[str, List[str]]:
         """Research all sections for a topic asynchronously
@@ -147,11 +167,10 @@ class ResearchDirector:
         
         # Just do market size section for testing
         section = ReportSection.MARKET_SIZE.value
-        result = await self.research_topic(topic, section)
-        if isinstance(result, str) and result.startswith("Error"):
-            warnings.append(f"Error researching {section}: {result}")
-        else:
-            report_path = result
+        report_path = await self.research_topic(topic, section)
+        
+        if not report_path:
+            warnings.append(f"Error researching {section}: No report generated")
             
         return report_path or "", warnings
     
